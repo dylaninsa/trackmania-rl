@@ -3,7 +3,7 @@ name = "trackmania-rl"
 version = "0.1.0"
 description = "MTI881 - Groupe 4 : apprentissage par renforcement sur TrackMania 2020 via TMRL"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "gymnasium",
     "numpy",
@@ -14,6 +14,8 @@ dependencies = [
 [project.optional-dependencies]
 # Nécessaire uniquement sur les machines qui lancent le jeu (Windows / Linux)
 trackmania = ["tmrl"]
+
+[dependency-groups]
 dev = ["pytest"]
 
 [build-system]
