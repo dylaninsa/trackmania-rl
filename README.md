@@ -20,20 +20,27 @@ n'est utilisé que pour son interface Gymnasium avec le jeu.
 
 ## Installation
 
+Le projet est géré avec [uv](https://docs.astral.sh/uv/). L'environnement virtuel
+est créé dans `.venv/` à la racine du dépôt ; il n'est pas versionné, mais
+`uv.lock` garantit que tout le monde a les mêmes versions.
+
 ```bash
-python -m venv .venv
-.venv\Scripts\activate            # Windows
-pip install -e ".[dev]"           # développement hors jeu (Pendulum-v1)
-pip install -e ".[dev,trackmania]"  # machine qui lance TrackMania
+uv sync                       # développement hors jeu (Pendulum-v1)
+uv sync --extra trackmania    # machine qui lance TrackMania (ajoute TMRL)
 ```
 
-L'installation de TrackMania 2020, d'OpenPlanet et de TMRL suit le
-[guide TMRL](https://github.com/trackmania-rl/tmrl/blob/master/readme/Install.md).
+Pour ajouter une dépendance : `uv add <paquet>`, puis commiter `pyproject.toml`
+et `uv.lock`.
 
-## Tests
+L'installation de TrackMania 2020 et d'OpenPlanet suit le
+[guide TMRL](https://github.com/trackmania-rl/tmrl/blob/master/readme/Install.md).
+Après le premier `uv sync --extra trackmania`, lancer `uv run python -m tmrl --install`.
+
+## Exécution et tests
 
 ```bash
-pytest
+uv run python scripts/<script>.py
+uv run pytest
 ```
 
 ## Contrat de l'environnement
