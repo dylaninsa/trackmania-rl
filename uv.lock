@@ -1899,12 +1899,8 @@ dependencies = [
     { name = "gymnasium" },
     { name = "numpy" },
     { name = "tensorboard" },
-    { name = "torch" },
-]
-
-[package.optional-dependencies]
-trackmania = [
     { name = "tmrl" },
+    { name = "torch" },
 ]
 
 [package.dev-dependencies]
@@ -1917,10 +1913,9 @@ requires-dist = [
     { name = "gymnasium" },
     { name = "numpy" },
     { name = "tensorboard" },
-    { name = "tmrl", marker = "extra == 'trackmania'" },
+    { name = "tmrl" },
     { name = "torch" },
 ]
-provides-extras = ["trackmania"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest" }]
