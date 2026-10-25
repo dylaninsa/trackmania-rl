@@ -10,8 +10,8 @@ Attributes:
     LAST_LIDAR (slice): Most recent LIDAR scan in the flattened observation.
     ACTIONS (slice): Past actions in the flattened observation, oldest first.
     OBS_DIM (int): Size of the flattened observation (83).
-    SPEED_SCALE (float): Speed normalization constant. Provisional: upper bound of the speed in TMRL's
-        observation space, to be calibrated with ``scripts/check_env.py``.
+    SPEED_SCALE (float): Speed normalization constant. The speed is in m/s (a manual lap of tmrl-test covered
+        2197 m in 43.2 s while the reported speed averaged about 50) and peaks around 75 on that track.
     LIDAR_SCALE (float): LIDAR normalization constant. Geometric bound: a beam is at most about 460 px long
         in a 958x488 window.
 """
@@ -30,7 +30,7 @@ LAST_LIDAR = slice(LIDAR.stop - NB_BEAMS, LIDAR.stop)
 ACTIONS = slice(LIDAR.stop, LIDAR.stop + ACT_BUF_LEN * ACT_DIM)
 OBS_DIM = ACTIONS.stop
 
-SPEED_SCALE = 1000.0
+SPEED_SCALE = 100.0
 LIDAR_SCALE = 500.0
 
 
