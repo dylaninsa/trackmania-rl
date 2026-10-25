@@ -25,8 +25,7 @@ est créé dans `.venv/` à la racine du dépôt ; il n'est pas versionné, mais
 `uv.lock` garantit que tout le monde a les mêmes versions.
 
 ```bash
-uv sync                       # développement hors jeu (Pendulum-v1)
-uv sync --extra trackmania    # machine qui lance TrackMania (ajoute TMRL)
+uv sync
 ```
 
 Pour ajouter une dépendance : `uv add <paquet>`, puis commiter `pyproject.toml`
@@ -34,7 +33,7 @@ et `uv.lock`.
 
 L'installation de TrackMania 2020 et d'OpenPlanet suit le
 [guide TMRL](https://github.com/trackmania-rl/tmrl/blob/master/readme/Install.md).
-Après le premier `uv sync --extra trackmania`, lancer `uv run python -m tmrl --install`.
+Après le premier `uv sync`, lancer `uv run python -m tmrl --install`.
 
 ## Exécution et tests
 
@@ -53,7 +52,7 @@ env = make_env()  # TrackMania doit être ouvert sur la piste tmrl-test
 Vérification avec le jeu : `uv run python scripts/check_env.py` (options : `--help`).
 
 **Observation** : vecteur `float32` de dimension 83. Les tranches sont définies
-dans `envs/wrappers.py` (`SPEED`, `LIDAR`, `LAST_LIDAR`, `ACTIONS`) ; utilisez-les
+dans `envs/trackmania.py` (`SPEED`, `LIDAR`, `LAST_LIDAR`, `ACTIONS`) ; utilisez-les
 plutôt que des indices en dur.
 
 | Indices | Contenu | Normalisation |
@@ -79,7 +78,7 @@ pour 10 m ; +100 à l'arrivée.
 - `truncated=True` : `ep_max_length` atteint (1000 pas = 50 s par défaut).
   Bootstrapper normalement.
 
-**`info`** : `pos`, `speed`, `end_of_track`, `traj_index`, `progress` (0 → 1),
+**`info`** : `speed`, `end_of_track`, `progress` (0 → 1),
 `distance_m`, `dist_to_traj`.
 
 **Contraintes temps réel**
