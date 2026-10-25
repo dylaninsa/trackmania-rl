@@ -1,1 +1,1 @@
-"""Politiques de référence : agent aléatoire et heuristique PID sur LIDAR."""
+"""Baseline policies: random agent and PID heuristic on LIDAR."""

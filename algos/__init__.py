@@ -1,1 +1,1 @@
-"""Algorithmes d'apprentissage : PPO et SAC."""
+"""Learning algorithms: PPO and SAC."""

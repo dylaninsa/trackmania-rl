@@ -9,7 +9,12 @@ from envs.wrappers import ACTIONS, LAST_LIDAR, LIDAR, OBS_DIM, SPEED, FlattenLid
 
 
 class FakeLidarEnv(gymnasium.Env):
-    """Imite l'espace d'observation de TMRL en mode LIDAR, sans le jeu."""
+    """Mimics TMRL's LIDAR observation space without the game.
+
+    Args:
+        lidar_shape (tuple[int, int]): Shape of the LIDAR history.
+        nb_actions (int): Number of past actions in the observation.
+    """
 
     def __init__(self, lidar_shape=(4, 19), nb_actions=2):
         act = gymnasium.spaces.Box(-1.0, 1.0, shape=(3,))

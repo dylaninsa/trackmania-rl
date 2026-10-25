@@ -1,4 +1,9 @@
-"""Création de l'environnement TrackMania 2020 (LIDAR) utilisé par tout le projet."""
+"""Creation of the TrackMania 2020 LIDAR environment used by the whole project.
+
+Attributes:
+    REPO_ROOT (pathlib.Path): Root of the repository.
+    DEFAULT_REWARD_PATH (pathlib.Path): Demonstration trajectory of the ``tmrl-test`` track.
+"""
 
 from pathlib import Path
 
@@ -10,21 +15,32 @@ DEFAULT_REWARD_PATH = REPO_ROOT / "data" / "reward" / "tmrl-test.pkl"
 
 def make_env(reward_path=DEFAULT_REWARD_PATH, ep_max_length=1000, flatten=True,
              speed_scale=SPEED_SCALE, lidar_scale=LIDAR_SCALE):
-    """Crée l'environnement Gymnasium TrackMania en mode LIDAR.
+    """Creates the TrackMania Gymnasium environment in LIDAR mode.
+
+    TMRL is imported inside this function because importing it fails on machines without the TmrlData
+    folder, which would break code that only needs ``envs.wrappers``.
 
     Args:
-        reward_path: trajectoire de démonstration (.pkl) de la piste chargée dans le jeu.
-        ep_max_length: nombre de pas (0,05 s chacun) avant troncation de l'épisode.
-        flatten: si True, l'observation est un vecteur float32 de dimension 83 (voir envs/wrappers.py) ;
-            sinon, le tuple brut (vitesse, LIDAR, action, action) de TMRL.
-        speed_scale, lidar_scale: constantes de normalisation (seulement si flatten=True).
+        reward_path (str | pathlib.Path): Demonstration trajectory (.pkl) of the track loaded in the game.
+        ep_max_length (int): Number of steps (0.05 s each) before the episode is truncated. It must be set
+            explicitly because rtgym defaults to ``np.inf``, which never truncates.
+        flatten (bool): If True, observations are float32 vectors of size 83 (see ``envs.wrappers``).
+            Otherwise, TMRL's raw ``(speed, lidar, action, action)`` tuple is returned.
+        speed_scale (float): Speed normalization constant, used only if ``flatten`` is True.
+        lidar_scale (float): LIDAR normalization constant, used only if ``flatten`` is True.
+
+    Returns:
+        gymnasium.Env: The real-time environment.
+
+    Raises:
+        FileNotFoundError: If ``reward_path`` does not exist. TMRL would otherwise silently use a dummy
+            trajectory.
+        ValueError: If ``TmrlData/config/config.json`` is not configured for this project.
     """
     reward_path = Path(reward_path)
     if not reward_path.exists():
-        # TMRL utiliserait silencieusement une trajectoire factice : on préfère échouer.
         raise FileNotFoundError(f"Trajectoire de démonstration introuvable : {reward_path}")
 
-    # Imports différés : TMRL plante à l'import si TmrlData n'existe pas (machines sans le jeu).
     import gymnasium
     import tmrl.config.config_constants as cfg
     from tmrl.config.config_objects import CONFIG_DICT
@@ -46,7 +62,7 @@ def make_env(reward_path=DEFAULT_REWARD_PATH, ep_max_length=1000, flatten=True,
     config = dict(CONFIG_DICT)
     config["interface"] = LidarInterface
     config["interface_kwargs"] = {"reward_path": reward_path, "img_hist_len": IMG_HIST_LEN, "gamepad": True}
-    config["ep_max_length"] = ep_max_length  # rtgym vaut np.inf par défaut : jamais de troncation
+    config["ep_max_length"] = ep_max_length
 
     env = gymnasium.make(cfg.RTGYM_VERSION, config=config, disable_env_checker=True)
     if flatten:
