@@ -28,9 +28,13 @@ class LidarInterface(TM2020InterfaceLidar):
         super().__init__(img_hist_len=img_hist_len, gamepad=gamepad)
         self.reward_path = str(reward_path)
 
-    def initialize_common(self):
-        """Initializes the game connection, then replaces TMRL's reward function with ours."""
-        super().initialize_common()
+    def initialize(self):
+        """Initializes the game connection, then replaces TMRL's reward function with ours.
+
+        ``initialize`` is overridden rather than ``initialize_common`` because TMRL's LIDAR interface calls
+        ``super().initialize_common()``, which would bypass an override of ``initialize_common``.
+        """
+        super().initialize()
         self.reward_function = self.make_reward_function()
 
     def make_reward_function(self):
