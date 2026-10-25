@@ -12,8 +12,8 @@ Attributes:
     OBS_DIM (int): Size of the flattened observation (83).
     SPEED_SCALE (float): Speed normalization constant. The speed is in m/s (a manual lap of tmrl-test covered
         2197 m in 43.2 s while the reported speed averaged about 50) and peaks around 75 on that track.
-    LIDAR_SCALE (float): LIDAR normalization constant. Geometric bound: a beam is at most about 460 px long
-        in a 958x488 window.
+    LIDAR_SCALE (float): LIDAR normalization constant, in pixels. The longest beam observed on tmrl-test in a
+        958x488 window is 483 px.
 """
 
 import gymnasium

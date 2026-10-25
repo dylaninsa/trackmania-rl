@@ -91,8 +91,15 @@ pour 10 m ; +100 à l'arrivée.
 - `reset(seed=...)` ne rend pas le jeu déterministe : la graine ne contrôle
   que la politique et les réseaux.
 
-La trajectoire `data/reward/tmrl-test.pkl` est celle fournie par TMRL pour la
-piste `tmrl-test` (30 273 points espacés de 0,1 m, environ 3 km).
+La trajectoire `data/reward/tmrl-test.pkl` a été enregistrée par nos soins sur
+`tmrl-test` (20 589 points espacés de 0,1 m, 2 059 m). Celle fournie par TMRL ne
+correspond pas à la piste : l'arrivée tombait à 72,6 % de progression.
+
+**Enregistrer une trajectoire** : `uv run python -m tmrl --record-reward` enregistre
+dès son lancement et s'arrête à l'arrivée. Faire un seul tour sans relancer la
+course : un respawn est enregistré comme une ligne droite vers le point de
+réapparition, et la progression se bloque ensuite à cet endroit. En cas d'erreur,
+arrêter avec Ctrl+C et recommencer.
 
 ## Méthode de travail
 
