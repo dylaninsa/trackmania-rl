@@ -1,27 +1,51 @@
-"""Mise en forme de l'observation LIDAR (indépendant de TMRL, testable sans le jeu)."""
+"""Formatting of the LIDAR observation, independent of TMRL and testable without the game.
+
+Attributes:
+    IMG_HIST_LEN (int): Number of LIDAR scans in the observation.
+    NB_BEAMS (int): Number of beams per scan. Beam 0 points right, beam 9 straight ahead, beam 18 left.
+    ACT_BUF_LEN (int): Number of past actions in the observation.
+    ACT_DIM (int): Size of an action, ``[gas, brake, steer]``.
+    SPEED (slice): Speed in the flattened observation.
+    LIDAR (slice): All LIDAR scans in the flattened observation, oldest first.
+    LAST_LIDAR (slice): Most recent LIDAR scan in the flattened observation.
+    ACTIONS (slice): Past actions in the flattened observation, oldest first.
+    OBS_DIM (int): Size of the flattened observation (83).
+    SPEED_SCALE (float): Speed normalization constant. Provisional: upper bound of the speed in TMRL's
+        observation space, to be calibrated with ``scripts/check_env.py``.
+    LIDAR_SCALE (float): LIDAR normalization constant. Geometric bound: a beam is at most about 460 px long
+        in a 958x488 window.
+"""
 
 import gymnasium
 import numpy as np
 
-IMG_HIST_LEN = 4  # nombre de balayages LIDAR dans l'observation
-NB_BEAMS = 19  # faisceaux par balayage (index 0 = droite, 9 = devant, 18 = gauche)
-ACT_BUF_LEN = 2  # nombre d'actions passées dans l'observation
-ACT_DIM = 3  # [gaz, frein, direction]
+IMG_HIST_LEN = 4
+NB_BEAMS = 19
+ACT_BUF_LEN = 2
+ACT_DIM = 3
 
-# Disposition du vecteur d'observation aplati (dimension OBS_DIM = 83)
 SPEED = slice(0, 1)
-LIDAR = slice(1, 1 + IMG_HIST_LEN * NB_BEAMS)  # balayage le plus ancien en premier
-LAST_LIDAR = slice(LIDAR.stop - NB_BEAMS, LIDAR.stop)  # balayage le plus récent
-ACTIONS = slice(LIDAR.stop, LIDAR.stop + ACT_BUF_LEN * ACT_DIM)  # action la plus ancienne en premier
+LIDAR = slice(1, 1 + IMG_HIST_LEN * NB_BEAMS)
+LAST_LIDAR = slice(LIDAR.stop - NB_BEAMS, LIDAR.stop)
+ACTIONS = slice(LIDAR.stop, LIDAR.stop + ACT_BUF_LEN * ACT_DIM)
 OBS_DIM = ACTIONS.stop
 
-# Constantes de normalisation, à calibrer avec scripts/check_env.py
-SPEED_SCALE = 1000.0  # borne haute de la vitesse dans l'observation_space de TMRL
-LIDAR_SCALE = 500.0  # borne géométrique : un faisceau mesure au plus ~460 px dans une fenêtre 958x488
+SPEED_SCALE = 1000.0
+LIDAR_SCALE = 500.0
 
 
 class FlattenLidarObservation(gymnasium.ObservationWrapper):
-    """Transforme le tuple (vitesse, LIDAR, action, action) de TMRL en un vecteur float32 de dimension 83."""
+    """Turns TMRL's ``(speed, lidar, action, action)`` tuple into a float32 vector of size ``OBS_DIM``.
+
+    Args:
+        env (gymnasium.Env): Environment whose observation space is TMRL's LIDAR tuple.
+        speed_scale (float): The speed is divided by this value.
+        lidar_scale (float): LIDAR distances are divided by this value.
+
+    Raises:
+        ValueError: If the observation space does not have ``IMG_HIST_LEN`` scans of ``NB_BEAMS`` beams
+            and ``ACT_BUF_LEN`` actions.
+    """
 
     def __init__(self, env, speed_scale=SPEED_SCALE, lidar_scale=LIDAR_SCALE):
         super().__init__(env)
@@ -39,6 +63,14 @@ class FlattenLidarObservation(gymnasium.ObservationWrapper):
         self.observation_space = gymnasium.spaces.Box(low=low, high=high, dtype=np.float32)
 
     def observation(self, observation):
+        """Flattens and normalizes one observation.
+
+        Args:
+            observation (tuple): TMRL observation ``(speed, lidar, action, action)``.
+
+        Returns:
+            np.ndarray: Float32 vector of size ``OBS_DIM``, laid out as described by the module slices.
+        """
         speed, lidar, *actions = observation
         return np.concatenate([
             np.asarray(speed, dtype=np.float32).ravel() / self.speed_scale,

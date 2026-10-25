@@ -1,30 +1,44 @@
-"""Test d'intégration de l'environnement avec le jeu.
+"""Integration test of the environment with the game.
 
-Prérequis : TrackMania ouvert sur la piste, en fenêtré, caméra cockpit (touche 3), plugin TMRL chargé.
-Cliquer dans la fenêtre du jeu juste après le lancement.
+Requires TrackMania open on the track, windowed, in cockpit view (key 3), with the TMRL plugin loaded.
+Click in the game window right after launching.
 
-    uv run python scripts/check_env.py                       # plein gaz tout droit, 3 épisodes
-    uv run python scripts/check_env.py --ep-max-length 100   # vérifier la troncation
-    uv run python scripts/check_env.py --manual              # conduire soi-même au clavier
+Examples:
+    Full throttle straight ahead for 3 episodes::
+
+        uv run python scripts/check_env.py
+
+    Check truncation::
+
+        uv run python scripts/check_env.py --ep-max-length 100
+
+    Drive manually with the keyboard::
+
+        uv run python scripts/check_env.py --manual
+
+Attributes:
+    TIME_STEP (float): Nominal duration of a real-time step in seconds.
 """
 
 import argparse
-import sys
 import time
 import warnings
-from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from envs.trackmania import DEFAULT_REWARD_PATH, make_env  # noqa: E402
-from envs.wrappers import LIDAR, OBS_DIM  # noqa: E402
+from envs.trackmania import DEFAULT_REWARD_PATH, make_env
+from envs.wrappers import LIDAR, OBS_DIM
 
 TIME_STEP = 0.05
 
 
 def main():
+    """Runs episodes with a constant action and reports rewards, progress, timing and raw maxima.
+
+    In manual mode no action is sent and TMRL's raw observation tuple is kept, because the None action
+    ends up in the observation. The first step of each episode is excluded from the timing statistics
+    because it includes the start-up delay.
+    """
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--episodes", type=int, default=3)
     parser.add_argument("--ep-max-length", type=int, default=1000)
@@ -35,7 +49,6 @@ def main():
     parser.add_argument("--print-every", type=int, default=10)
     args = parser.parse_args()
 
-    # En manuel, l'action None se retrouve dans l'observation : on garde le tuple brut de TMRL.
     env = make_env(reward_path=args.reward_path, ep_max_length=args.ep_max_length, flatten=not args.manual)
     action = None if args.manual else np.array([args.gas, 0.0, args.steer], dtype=np.float32)
 
@@ -74,7 +87,7 @@ def main():
                           f"distance={info['distance_m']:7.1f} m  écart={info['dist_to_traj']:5.1f}  "
                           f"vitesse={info['speed']:6.1f}")
 
-        durations = np.array(durations[1:])  # le premier pas inclut le temps de démarrage
+        durations = np.array(durations[1:])
         cause = "arrivée" if info["end_of_track"] else "échec (bloqué / hors trajectoire)" if terminated else "troncation"
         print(f"Épisode {episode + 1} : {step} pas, retour {ep_return:.2f}, fin = {cause}")
         if len(durations):
