@@ -38,14 +38,17 @@ class TrajectoryReward:
         patience (int): The episode terminates after this many consecutive steps without progress.
         grace_steps (int): Number of steps at the start of an episode during which a lack of progress is not
             counted, because the car starts from a standstill.
+        finish_bonus (float): Bonus reward for completing the trajectory.
     """
 
-    def __init__(self, trajectory, max_forward_points=500, max_distance_m=20.0, patience=10, grace_steps=70):
+    def __init__(self, trajectory, max_forward_points=500, max_distance_m=20.0, patience=10, grace_steps=70,
+                 finish_bonus=100.0):
         self.trajectory = trajectory
         self.max_forward_points = max_forward_points
         self.max_distance_m = max_distance_m
         self.patience = patience
         self.grace_steps = grace_steps
+        self.finish_bonus = finish_bonus
         self.reset()
 
     def reset(self):
@@ -74,14 +77,16 @@ class TrajectoryReward:
         nearest_idx = np.argmin(distances)
         return int(start + nearest_idx), float(distances[nearest_idx])
 
-    def compute_reward(self, pos):
+    def compute_reward(self, pos, finished=False):
         """Computes the reward of one step and whether the episode must terminate.
 
         Args:
             pos (np.ndarray): Position ``(x, y, z)`` of the car.
+            finished (bool): Whether the car has reached the end of the trajectory.
 
         Returns:
-            tuple[float, bool]: Reward (number of points passed divided by 100) and terminated flag.
+            tuple[float, bool]: Reward (number of points passed divided by 100, and bonus for finishing)
+                and terminated flag.
         """
         self.steps += 1
         nearest_idx, dist_to_traj = self.nearest_point(pos)
@@ -94,6 +99,8 @@ class TrajectoryReward:
         elif self.steps > self.grace_steps:
             self.steps_without_progress += 1
         self.index = nearest_idx
+        if finished:
+            return reward + self.finish_bonus, True
         if self.steps_without_progress >= self.patience:
             return reward, True
         return reward, False

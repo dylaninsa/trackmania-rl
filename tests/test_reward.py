@@ -77,6 +77,12 @@ def test_terminates_when_off_track():
     assert rf.dist_to_traj == pytest.approx(6.0)
 
 
+def test_finish_bonus():
+    rf = TrajectoryReward(make_line(), finish_bonus=100.0)
+
+    assert rf.compute_reward(np.array([1.0, 0.0, 0.0]), finished=True) == (pytest.approx(100.1), True)
+
+
 def test_progress_and_distance():
     rf = TrajectoryReward(make_line())
     assert (rf.progress, rf.distance_m) == (0.0, 0.0)
