@@ -1,1 +1,1 @@
-"""Réseaux Acteur / Critique en PyTorch."""
+"""Actor and critic networks in PyTorch."""

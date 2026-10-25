@@ -12,7 +12,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Nécessaire uniquement sur les machines qui lancent le jeu (Windows / Linux)
 trackmania = ["tmrl"]
 
 [dependency-groups]

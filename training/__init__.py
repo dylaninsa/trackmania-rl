@@ -1,1 +1,1 @@
-"""Boucle d'entraînement, logs et checkpoints."""
+"""Training loop, logging and checkpoints."""
