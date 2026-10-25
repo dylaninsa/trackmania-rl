@@ -36,8 +36,9 @@ def main():
     """Runs episodes with a constant action and reports rewards, progress, timing and raw maxima.
 
     In manual mode no action is sent and TMRL's raw observation tuple is kept, because the None action
-    ends up in the observation. The first step of each episode is excluded from the timing statistics
-    because it includes the start-up delay.
+    ends up in the observation. The first and last steps of each episode are excluded from the timing
+    statistics: the first includes the start-up delay and the last includes the pause triggered by
+    ``wait_on_done`` (about 0.7 s).
     """
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--episodes", type=int, default=3)
@@ -87,7 +88,7 @@ def main():
                           f"distance={info['distance_m']:7.1f} m  écart={info['dist_to_traj']:5.1f}  "
                           f"vitesse={info['speed']:6.1f}")
 
-        durations = np.array(durations[1:])
+        durations = np.array(durations[1:-1])
         cause = "arrivée" if info["end_of_track"] else "échec (bloqué / hors trajectoire)" if terminated else "troncation"
         print(f"Épisode {episode + 1} : {step} pas, retour {ep_return:.2f}, fin = {cause}")
         if len(durations):

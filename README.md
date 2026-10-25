@@ -58,7 +58,7 @@ plutôt que des indices en dur.
 
 | Indices | Contenu | Normalisation |
 |---------|---------|---------------|
-| `0` | vitesse | ÷ `SPEED_SCALE` (1000, provisoire) |
+| `0` | vitesse (m/s) | ÷ `SPEED_SCALE` (100) |
 | `1–76` | 4 balayages LIDAR de 19 faisceaux, du plus ancien au plus récent | ÷ `LIDAR_SCALE` (500) |
 | `77–82` | 2 dernières actions envoyées, la plus ancienne en premier | aucune |
 
