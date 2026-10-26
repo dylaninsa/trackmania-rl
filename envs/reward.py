@@ -41,7 +41,7 @@ class TrajectoryReward:
         finish_bonus (float): Bonus reward for completing the trajectory.
     """
 
-    def __init__(self, trajectory, max_forward_points=500, max_distance_m=20.0, patience=10, grace_steps=70,
+    def __init__(self, trajectory, max_forward_points=500, max_distance_m=30.0, patience=10, grace_steps=70,
                  finish_bonus=100.0):
         self.trajectory = trajectory
         self.max_forward_points = max_forward_points
