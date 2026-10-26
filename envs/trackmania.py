@@ -17,7 +17,6 @@ Attributes:
     ACTIONS (slice): The 2 previous actions in the observation.
     SPEED_SCALE (float): Speed normalization constant. The speed peaks around 80 m/s on tmrl-test.
     LIDAR_SCALE (float): LIDAR normalization constant. The longest beam observed on tmrl-test is 483 px.
-    POINT_SPACING_M (float): Distance in meters between two points of a recorded trajectory.
     DEFAULT_REWARD_PATH (pathlib.Path): Demonstration trajectory of the tmrl-test track.
 """
 
@@ -28,7 +27,8 @@ import numpy as np
 import tmrl.config.config_constants as cfg
 from tmrl.config.config_objects import CONFIG_DICT
 from tmrl.custom.tm.tm_gym_interfaces import TM2020InterfaceLidar
-from tmrl.custom.tm.utils.compute_reward import RewardFunction
+
+from envs.reward import TrajectoryReward, load_trajectory
 
 SPEED = slice(0, 1)
 LIDAR = slice(1, 77)
@@ -37,7 +37,6 @@ ACTIONS = slice(77, 83)
 
 SPEED_SCALE = 100.0
 LIDAR_SCALE = 500.0
-POINT_SPACING_M = 0.1
 DEFAULT_REWARD_PATH = Path(__file__).resolve().parents[1] / "data" / "reward" / "tmrl-test.pkl"
 
 
@@ -54,18 +53,9 @@ class LidarInterface(TM2020InterfaceLidar):
         self.data = None
 
     def initialize(self):
-        """Connects to the game, then replaces TMRL's reward function with one that reads our trajectory.
-
-        The reward computation itself is still TMRL's, until ``envs/reward.py`` replaces it.
-        """
+        """Connects to the game, then replaces TMRL's reward function with one that reads our trajectory."""
         super().initialize()
-        rc = cfg.REWARD_CONFIG
-        self.reward_function = RewardFunction(reward_data_path=self.reward_path,
-                                              nb_obs_forward=rc["CHECK_FORWARD"],
-                                              nb_obs_backward=rc["CHECK_BACKWARD"],
-                                              nb_zero_rew_before_failure=rc["FAILURE_COUNTDOWN"],
-                                              min_nb_steps_before_failure=rc["MIN_STEPS"],
-                                              max_dist_from_traj=rc["MAX_STRAY"])
+        self.reward_function = TrajectoryReward(load_trajectory(self.reward_path))
 
     def send_control(self, control):
         """Sends an action clipped to [-1, 1], because the virtual gamepad crashes on other values.
@@ -100,13 +90,18 @@ class LidarInterface(TM2020InterfaceLidar):
         return obs, self.info()
 
     def get_obs_rew_terminated_info(self):
-        """Captures the observation and computes the reward.
+        """Grabs the LIDAR and speed, computes the reward and builds the ``info`` dictionary.
+        
+        It does not call TMRL's version so that the finish signal can be passed to our reward.
 
         Returns:
             tuple[list, np.float32, bool, dict]: Observation, reward, terminated flag and ``info``.
         """
-        obs, rew, terminated, _ = super().get_obs_rew_terminated_info()
-        return obs, rew, terminated, self.info()
+        lidar, speed, data = self.grab_lidar_speed_and_data()
+        self.img_hist.append(lidar)
+        reward, terminated = self.reward_function.compute_reward(data[2:5], finished=bool(data[8]))
+        obs = [speed, np.array(list(self.img_hist), dtype=np.float32)]
+        return obs, np.float32(reward), terminated, self.info()
 
     def info(self):
         """Builds the ``info`` dictionary from the last OpenPlanet data.
@@ -116,13 +111,12 @@ class LidarInterface(TM2020InterfaceLidar):
                 ``distance_m`` (along the trajectory) and ``dist_to_traj`` (m).
         """
         rf = self.reward_function
-        pos = np.array(self.data[2:5])
         return {
             "speed": self.data[0],
             "end_of_track": bool(self.data[8]),
-            "progress": rf.cur_idx / (rf.datalen - 1),
-            "distance_m": rf.cur_idx * POINT_SPACING_M,
-            "dist_to_traj": float(np.linalg.norm(pos - rf.data[rf.cur_idx])),
+            "progress": rf.progress,
+            "distance_m": rf.distance_m,
+            "dist_to_traj": rf.dist_to_traj,
         }
 
 

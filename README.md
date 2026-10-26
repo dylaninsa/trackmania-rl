@@ -68,15 +68,22 @@ Au `reset()`, les 4 balayages sont identiques et les actions valent `[0, 0, 0]`.
 l'envoi au jeu). Seules les valeurs positives du gaz et du frein ont un effet ;
 direction > 0 tourne à droite. Un pas dure 0,05 s (20 Hz).
 
-**Récompense** (provisoire : celle de TMRL, remplacée à l'étape 5) : nombre de
-points de la trajectoire franchis depuis le pas précédent ÷ 100, soit 1 unité
-pour 10 m ; +100 à l'arrivée.
+**Récompense** : calculée par `TrajectoryReward` (`envs/reward.py`). C'est le
+nombre de points de la trajectoire franchis depuis le pas précédent ÷ 100, soit
+1 unité pour 10 m, plus un bonus de +100 au pas de l'arrivée. Elle n'est jamais
+négative : reculer ne rapporte rien.
 
 **Fin d'épisode**
-- `terminated=True` : arrivée, ou aucune progression pendant 10 pas consécutifs
-  (après 70 pas de grâce au départ). Ne pas bootstrapper.
+- `terminated=True` dans trois cas :
+  - arrivée franchie, avec le bonus de +100 ;
+  - aucune progression pendant 10 pas consécutifs, après 70 pas de grâce au
+    départ ;
+  - écart de plus de 30 m avec la trajectoire. En longeant le mur sur
+    `tmrl-test`, la voiture atteint 20 m d'écart : le seuil garde 10 m de marge.
 - `truncated=True` : `ep_max_length` atteint (1000 pas = 50 s par défaut).
-  Bootstrapper normalement.
+
+Les réglages de la récompense sont les paramètres de `TrajectoryReward`. La
+section `REWARD_CONFIG` de `config.json` n'est plus utilisée.
 
 **`info`** : `speed`, `end_of_track`, `progress` (0 → 1),
 `distance_m`, `dist_to_traj`.

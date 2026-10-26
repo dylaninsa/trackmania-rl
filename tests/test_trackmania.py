@@ -1,9 +1,12 @@
 import pickle
+from collections import deque
 
 import gymnasium
 import numpy as np
+import pytest
 import tmrl.custom.tm.tm_gym_interfaces as tm_interfaces
 
+from envs.reward import TrajectoryReward
 from envs.trackmania import (ACTIONS, LAST_LIDAR, LIDAR, LIDAR_SCALE, SPEED, SPEED_SCALE, FlattenLidarObservation,
                              LidarInterface)
 
@@ -45,4 +48,26 @@ def test_interface_reads_our_trajectory(tmp_path, monkeypatch):
     interface = LidarInterface(reward_path)
     interface.initialize()
 
-    np.testing.assert_array_equal(interface.reward_function.data, trajectory)
+    np.testing.assert_array_equal(interface.reward_function.trajectory, trajectory)
+
+
+def test_interface_step_gives_our_finish_bonus(monkeypatch):
+    lidar = np.ones(19, dtype=np.float32)
+    speed = np.array([30.0], dtype=np.float32)
+    data = (30.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+    monkeypatch.setattr(tm_interfaces.TM2020InterfaceLidar, "grab_lidar_speed_and_data",
+                        lambda self: (lidar, speed, data))
+    line = np.stack([np.arange(100) * 0.1, np.zeros(100), np.zeros(100)], axis=1)
+    interface = LidarInterface("unused.pkl")
+    interface.reward_function = TrajectoryReward(line, finish_bonus=100.0)
+    interface.img_hist = deque([np.zeros(19, dtype=np.float32)] * 4, maxlen=4)
+
+    obs, reward, terminated, info = interface.get_obs_rew_terminated_info()
+
+    assert len(obs) == 2
+    assert obs[1].shape == (4, 19)
+    np.testing.assert_array_equal(obs[1][-1], lidar)
+    assert reward == pytest.approx(100.1)
+    assert terminated
+    assert info["end_of_track"]
+    assert info["distance_m"] == pytest.approx(1.0)
