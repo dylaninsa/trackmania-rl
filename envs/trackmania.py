@@ -149,7 +149,7 @@ class FlattenLidarObservation(gymnasium.ObservationWrapper):
         ]).astype(np.float32)
 
 
-def make_env(reward_path=DEFAULT_REWARD_PATH, ep_max_length=1000, flatten=True):
+def make_env(reward_path=DEFAULT_REWARD_PATH, ep_max_length=3000, flatten=True):
     """Creates the TrackMania environment.
 
     Args:

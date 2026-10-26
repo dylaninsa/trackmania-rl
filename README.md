@@ -80,7 +80,9 @@ négative : reculer ne rapporte rien.
     départ ;
   - écart de plus de 30 m avec la trajectoire. En longeant le mur sur
     `tmrl-test`, la voiture atteint 20 m d'écart : le seuil garde 10 m de marge.
-- `truncated=True` : `ep_max_length` atteint (1000 pas = 50 s par défaut).
+- `truncated=True` : `ep_max_length` atteint (3000 pas = 150 s par défaut). Cette
+  limite laisse au PID, qui met environ 2 330 pas, le temps de finir le parcours ;
+  utiliser la même valeur pour toutes les politiques comparées.
 
 Les réglages de la récompense sont les paramètres de `TrajectoryReward`. La
 section `REWARD_CONFIG` de `config.json` n'est plus utilisée.
@@ -106,6 +108,41 @@ dès son lancement et s'arrête à l'arrivée. Faire un seul parcours sans relan
 course : un respawn est enregistré comme une ligne droite vers le point de
 réapparition, et la progression se bloque ensuite à cet endroit. En cas d'erreur,
 arrêter avec Ctrl+C et recommencer.
+
+## Politiques de référence
+
+Deux baselines, dans `baselines/policies.py`, partagent l'interface des futurs
+agents : `act(obs)` renvoie l'action, `reset()` est appelée en début d'épisode.
+
+- **`RandomPolicy(seed)`** : chaque action est tirée uniformément dans [-1, 1].
+  Gaz et frein étant chacun actifs la moitié du temps, la voiture avance à peine.
+  C'est la borne basse.
+- **`PIDPolicy`** : suivi du centre de la piste à partir du dernier balayage LIDAR.
+  - Direction : PID sur l'erreur « place à droite − place à gauche » (moyenne des
+    faisceaux 0 à 8 moins celle des faisceaux 10 à 18).
+  - Vitesse visée : de `min_speed` à `max_speed` selon le faisceau avant (9),
+    multipliée par `1 − |direction|` pour ralentir en braquant, et jamais sous
+    `min_speed`. Gaz sous la vitesse visée, frein au-delà de `brake_margin`.
+  - Réglages retenus : `kp=6`, `ki=0`, `kd=0.6`, `min_speed=10`, `max_speed=60`,
+    `brake_margin=5`.
+
+**Évaluation** : `scripts/evaluate.py` fait tourner une politique en jeu et
+enregistre un CSV par exécution dans `results/` (non versionné).
+
+```bash
+uv run python scripts/evaluate.py --policy pid --episodes 5
+uv run python scripts/evaluate.py --policy random --episodes 10 --seed 0
+```
+
+**Premiers résultats sur `tmrl-test`** :
+
+| Politique | Épisodes | Distance moyenne | Parcours terminés | Temps de parcours |
+|-----------|----------|------------------|-------------------|-------------------|
+| Aléatoire (graine 0) | 2 | 5,8 m | 0/2 | — |
+| PID | 3 | 2 058,8 m | 3/3 | ~116 s |
+
+Limite connue du PID : il réagit à ce qu'il voit sans anticiper, et frôle le mur
+à environ 10 m/s dans le virage serré situé vers 1 659 m.
 
 ## Méthode de travail
 

@@ -83,7 +83,7 @@ def main():
     parser.add_argument("--policy", choices=["random", "pid"], required=True)
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--seed", type=int, default=None, help="graine de l'agent aléatoire (ignorée par le PID)")
-    parser.add_argument("--ep-max-length", type=int, default=1000)
+    parser.add_argument("--ep-max-length", type=int, default=3000)
     parser.add_argument("--output", default=None, help="fichier CSV de sortie")
     args = parser.parse_args()
 
