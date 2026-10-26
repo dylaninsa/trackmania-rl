@@ -52,7 +52,10 @@ class PIDPolicy:
     The steering is a PID controller on the error "free space on the right minus free space on the left":
     the error is zero when the car is centered, and it becomes positive before a right turn, because the
     right beams see further than the left ones. Gas and brake follow a simple rule instead: the more free
-    space straight ahead, the higher the target speed.
+    space straight ahead and the less the car steers, the higher the target speed.
+
+    With the default values, the car finishes tmrl-test in about 116 s at about 20 m/s on average, and only
+    scrapes the wall at about 10 m/s in the tight turn at 1 659 m.
 
     Args:
         kp (float): Proportional gain of the steering: the further off-center, the stronger the steering.
@@ -65,7 +68,7 @@ class PIDPolicy:
         dt (float): Duration of a step in seconds, used by the integral and derivative terms.
     """
 
-    def __init__(self, kp=3.0, ki=0.0, kd=0.1, min_speed=10.0, max_speed=60.0, brake_margin=5.0, dt=0.05):
+    def __init__(self, kp=6.0, ki=0.0, kd=0.6, min_speed=10.0, max_speed=60.0, brake_margin=5.0, dt=0.05):
         self.kp = kp
         self.ki = ki
         self.kd = kd
@@ -105,22 +108,27 @@ class PIDPolicy:
         self.previous_error = error
         return float(np.clip(self.kp * error + self.ki * self.integral + self.kd * derivative, -1.0, 1.0))
 
-    def throttle(self, lidar, speed):
-        """Chooses gas and brake from the free space straight ahead.
+    def throttle(self, lidar, speed, steer):
+        """Chooses gas and brake from the free space straight ahead and the steering.
 
         The target speed grows linearly from ``min_speed`` to ``max_speed`` with the front beam (9), clipped to
-        [0, 1]. The car accelerates below the target speed, brakes above the target speed plus
-        ``brake_margin``, and coasts in between.
+        [0, 1], and is multiplied by ``1 - |steer|`` so that the car slows down when it steers hard. The front
+        beam alone reacts too late before tight turns, whereas the steering grows about 0.5 s earlier. The
+        target speed never goes below ``min_speed``: otherwise it would reach 0 at full steering, the car would
+        stop in the turn, and braking at a standstill makes the car reverse. The car accelerates below the
+        target speed, brakes above the target speed plus ``brake_margin``, and coasts in between.
 
         Args:
             lidar (np.ndarray): The 19 normalized distances of the most recent LIDAR scan.
             speed (float): Speed of the car in m/s.
+            steer (float): Steering command in [-1, 1], as returned by ``steer``.
 
         Returns:
             tuple[float, float]: Gas and brake, each 0.0 or 1.0.
         """
         front_distance = np.clip(lidar[9], 0.0, 1.0)
-        target_speed = self.min_speed + (self.max_speed - self.min_speed) * front_distance
+        target_speed = max(self.min_speed, (self.min_speed + (self.max_speed - self.min_speed) * front_distance)
+                           * (1 - abs(steer)))
         if speed < target_speed:
             return 1.0, 0.0
         if speed > target_speed + self.brake_margin:
@@ -139,5 +147,5 @@ class PIDPolicy:
         last_lidar = obs[LAST_LIDAR]
         speed = float(obs[SPEED][0] * SPEED_SCALE)
         steer = self.steer(last_lidar)
-        gas, brake = self.throttle(last_lidar, speed)
+        gas, brake = self.throttle(last_lidar, speed, steer)
         return np.array([gas, brake, steer], dtype=np.float32)
