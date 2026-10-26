@@ -102,7 +102,7 @@ La trajectoire `data/reward/tmrl-test.pkl` a été enregistrée par nos soins su
 correspond pas à la piste : l'arrivée tombait à 72,6 % de progression.
 
 **Enregistrer une trajectoire** : `uv run python -m tmrl --record-reward` enregistre
-dès son lancement et s'arrête à l'arrivée. Faire un seul tour sans relancer la
+dès son lancement et s'arrête à l'arrivée. Faire un seul parcours sans relancer la
 course : un respawn est enregistré comme une ligne droite vers le point de
 réapparition, et la progression se bloque ensuite à cet endroit. En cas d'erreur,
 arrêter avec Ctrl+C et recommencer.

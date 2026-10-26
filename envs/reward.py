@@ -1,8 +1,9 @@
 """Reward based on the progress of the car along a demonstration trajectory.
 
-The demonstration trajectory is a lap recorded with ``python -m tmrl --record-reward``, stored as points
-spaced ``POINT_SPACING_M`` apart. At each step, the car is matched to the closest point ahead of its current
-point, and the reward is the number of points passed since the previous step, divided by 100.
+The demonstration trajectory is a run from start to finish recorded with ``python -m tmrl --record-reward``,
+stored as points spaced ``POINT_SPACING_M`` apart. At each step, the car is matched to the closest point
+ahead of its current point, and the reward is the number of points passed since the previous step, divided
+by 100.
 
 Attributes:
     POINT_SPACING_M (float): Distance in meters between two consecutive points of a trajectory.
