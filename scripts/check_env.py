@@ -33,7 +33,7 @@ def main():
     """
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--episodes", type=int, default=3)
-    parser.add_argument("--ep-max-length", type=int, default=1000)
+    parser.add_argument("--ep-max-length", type=int, default=3000)
     parser.add_argument("--gas", type=float, default=1.0)
     parser.add_argument("--steer", type=float, default=0.0)
     parser.add_argument("--manual", action="store_true", help="n'envoie aucune action : on conduit au clavier")
