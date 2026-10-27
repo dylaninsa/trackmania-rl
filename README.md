@@ -134,12 +134,18 @@ uv run python scripts/evaluate.py --policy pid --episodes 5
 uv run python scripts/evaluate.py --policy random --episodes 10 --seed 0
 ```
 
-**Premiers résultats sur `tmrl-test`** :
+**Résultats sur `tmrl-test`** (`ep_max_length = 3000`) :
 
 | Politique | Épisodes | Distance moyenne | Parcours terminés | Temps de parcours |
 |-----------|----------|------------------|-------------------|-------------------|
-| Aléatoire (graine 0) | 2 | 5,8 m | 0/2 | — |
-| PID | 3 | 2 058,8 m | 3/3 | ~116 s |
+| Aléatoire (graines 0, 1, 2) | 3 × 10 | 4,7 m (± 1,2 entre graines) | 0/30 | — |
+| PID | 5 | 2 058,8 m | 5/5 | 116,4 s (± 0,4) |
+
+- Aléatoire : moyennes par graine de 6,1, 3,9 et 4,0 m ; au mieux 19,1 m. La
+  plupart des épisodes s'arrêtent au pas 80, soit les 70 pas de grâce plus 10
+  pas sans progression.
+- PID : temps de parcours entre 115,95 et 116,90 s. Il est déterministe, mais le
+  jeu ne l'est pas tout à fait, d'où ces petites variations.
 
 Limite connue du PID : il réagit à ce qu'il voit sans anticiper, et frôle le mur
 à environ 10 m/s dans le virage serré situé vers 1 659 m.
