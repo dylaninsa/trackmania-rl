@@ -1,0 +1,15 @@
+{
+  "env": "Pendulum-v1",
+  "seed": 0,
+  "total_steps": 20000,
+  "start_steps": 1000,
+  "buffer_size": 1000000,
+  "batch_size": 256,
+  "eval_every": 2000,
+  "eval_episodes": 10,
+  "hidden": 256,
+  "lr": 0.0003,
+  "gamma": 0.99,
+  "tau": 0.005,
+  "device": "cpu"
+}
