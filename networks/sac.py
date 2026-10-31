@@ -77,3 +77,38 @@ class Actor(nn.Module):
         log_prob = dist.log_prob(u).sum(dim=-1)
         log_prob_corrected = log_prob - 2 * (math.log(2) - u - F.softplus(-2 * u)).sum(dim=-1)
         return torch.tanh(u), log_prob_corrected
+
+
+class Critic(nn.Module):
+    """Action-value function Q(s, a): the expected discounted return, entropy bonus included, of taking
+    action ``a`` in state ``s`` and then following the policy.
+
+    The observation and the action are concatenated and fed to a single MLP with one output. SAC uses two
+    such critics and their two target copies, all created by the agent.
+
+    Args:
+        obs_dim (int): Size of an observation.
+        act_dim (int): Size of an action.
+        hidden (int): Number of units of each of the two hidden layers.
+    """
+
+    def __init__(self, obs_dim, act_dim, hidden):
+        super().__init__()
+        self.net = mlp(obs_dim + act_dim, 1, hidden)
+
+    def forward(self, obs, act):
+        """Estimates Q for a batch of observation-action pairs.
+
+        The last dimension of the MLP output is squeezed so that Q has the same shape as the rewards and the
+        Bellman target. A ``(B, 1)`` output would silently broadcast against a ``(B,)`` target into a
+        ``(B, B)`` matrix and make the loss wrong without raising any error.
+
+        Args:
+            obs (torch.Tensor): Float32 observations of shape ``(B, obs_dim)``.
+            act (torch.Tensor): Float32 actions of shape ``(B, act_dim)``.
+
+        Returns:
+            torch.Tensor: Q values of shape ``(B,)``.
+        """
+        x = torch.cat([obs, act], dim=-1)
+        return self.net(x).squeeze(-1)
