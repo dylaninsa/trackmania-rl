@@ -24,6 +24,14 @@ Le projet est géré avec [uv](https://docs.astral.sh/uv/). L'environnement virt
 est créé dans `.venv/` à la racine du dépôt ; il n'est pas versionné, mais
 `uv.lock` garantit que tout le monde a les mêmes versions.
 
+pour installer uv :
+```bash
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+(Après l'installation, fermez et rouvrez votre terminal pour que la commande uv soit reconnue).
+
+Une fois le terminal rouvert, et après s'être placé à la racine du projet : 
 ```bash
 uv sync
 ```
