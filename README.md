@@ -13,7 +13,7 @@ n'est utilisé que pour son interface Gymnasium avec le jeu.
 | `networks/`  | Réseaux Acteur / Critique (PyTorch)                                | Membre 2 |
 | `algos/`     | PPO et SAC                                                         | Membre 2 |
 | `training/`  | Boucle d'entraînement, logs, checkpoints                           | Membre 3 |
-| `scripts/`   | Points d'entrée : entraînement, évaluation                         | Membres 3 et 4 |
+| `scripts/`   | Points d'entrée : entraînement, évaluation, test d'intégration SAC | Membres 3 et 4 |
 | `configs/`   | Hyperparamètres et graines des expériences                         | Membre 4 |
 | `data/reward/` | Trajectoire de démonstration utilisée par la récompense          | Membre 1 |
 | `tests/`     | Tests unitaires (exécutables sans le jeu)                          | Tous |
@@ -157,6 +157,79 @@ uv run python scripts/evaluate.py --policy random --episodes 10 --seed 0
 
 Limite connue du PID : il réagit à ce qu'il voit sans anticiper, et frôle le mur
 à environ 10 m/s dans le virage serré situé vers 1 659 m.
+
+**Replay buffer**
+`algos/replay_buffer.py` stocke les transitions pour SAC. La boucle d'entraînement y ajoute chaque pas et tire des lots qu'elle passe à `SACAgent.update`.
+
+```python
+from algos.replay_buffer import ReplayBuffer
+buffer = ReplayBuffer(obs_dim=83, act_dim=3, capacity=100_000, device="cpu", seed=0)
+buffer.add(obs, act, rew, next_obs, terminated)
+batch = buffer.sample(256)  # dict de tenseurs float32 : obs, act, rew, next_obs, terminated
+```
+
+Choix de conception :
+- **Tampon circulaire** de tableaux numpy préalloués : une fois plein, les nouvelles transitions écrasent les plus anciennes. Une transition occupe environ 0,7 Ko (171 flottants), soit 68 Mo pour 100 000 transitions et 0,7 Go pour 1 million.
+- **Seul `terminated` est stocké, pas `truncated`**. Un épisode tronqué à `ep_max_length` aurait pu continuer : sa dernière transition doit rester bootstrapée dans la cible de Bellman. Les épisodes terminés par un échec ou par l'arrivée coupent le futur.
+- **`rew` et `terminated` ont la forme `(B,)`, pas `(B, 1)`**. Les critiques renvoient des Q de forme `(B,)` : avec une cible `(B, 1)`, le broadcasting produirait une matrice `(B, B)` sans aucune erreur, et la perte serait fausse.
+- **`seed` optionnel** : `torch.manual_seed` ne contrôle pas le tirage des lots (numpy). Sans cette graine, deux entraînements avec la même graine divergeraient, ce qui contredit le protocole « plusieurs graines ».
+- `sample` lève une `ValueError` si le tampon est vide.
+
+Tests (sans le jeu) : 
+```bash
+uv run pytest tests/test_replay_buffer.py.
+```
+
+## Test d'intégration SAC et TrackMania
+ 
+`scripts/sac_smoke_test.py` vérifie sur le vrai jeu que la chaîne environnement → replay buffer → agent SAC
+fonctionne, avant de lancer de longs entraînements. **Ce n'est pas un script d'entraînement** : l'agent est
+beaucoup trop peu entraîné pour apprendre quoi que ce soit.
+ 
+```bash
+uv run python scripts/sac_smoke_test.py
+uv run python scripts/sac_smoke_test.py --device cuda --episodes 5   # options : --help
+```
+ 
+Même préparation que `check_env.py` (jeu ouvert sur `tmrl-test`, fenêtré, vue cockpit, clic dans la
+fenêtre). Le script se déroule en quatre phases :
+ 
+1. **Warm-up** : actions aléatoires pour remplir le tampon.
+2. **Épisodes SAC** (politique stochastique, 300 pas maximum) avec des mises à jour de gradient **entre**
+   les épisodes uniquement, puisque le jeu ne se met pas en pause pendant un épisode.
+3. **Évaluation** : un épisode avec la politique déterministe.
+4. **Checkpoint** : `save` puis `load` dans un nouvel agent doivent donner la même action.
+Il vérifie le contrat de l'environnement (observation de 83 `float32`, 4 balayages identiques et actions
+nulles au `reset`, clés de `info`, récompense jamais négative), la validité des actions, la finitude des
+métriques de `update`, et mesure la durée de `act()`, d'un pas et d'une mise à jour. Les violations sont
+listées en fin d'exécution et le code de sortie vaut 1 s'il y en a.
+ 
+**Résultats** (machine d'Antoine, CPU ; réseaux de 256 unités, lots de 256 ; réglages provisoires fixés
+dans le script, à remplacer par `configs/`) :
+ 
+| Mesure | Valeur | Lecture |
+|--------|--------|---------|
+| Durée d'un pas avec SAC | 50,0 à 50,3 ms en moyenne, pics de 55 à 67 ms | Identique à `check_env.py` (50,0 ms) : `act()` ne fait pas dépasser le budget de 0,05 s |
+| `act()` | environ 1,2 ms | Négligeable devant le pas |
+| Mise à jour (CPU) | environ 12,6 ms | 3 000 mises à jour, soit un épisode complet de 3 000 pas, coûtent environ 38 s, contre 150 s de jeu |
+| Agent non entraîné | 0,5 à 2,5 m (stochastique), 0,0 m (déterministe), fin au pas 80 à 86 | Même comportement que la politique aléatoire (4 à 8 m) : attendu |
+| Checkpoint | identique | `save`/`load` conservent la politique |
+ 
+Ce qu'on en retient pour la boucle d'entraînement :
+ 
+- **Ratio mises à jour / données.** Au ratio 1:1, les mises à jour entre les épisodes ajoutent environ 25 %
+  de temps mort (38 s pour 150 s de jeu) sur CPU. C'est acceptable, et à remesurer sur la machine GPU.
+- **Pics de durée de pas.** Sous SAC, les pas les plus longs (jusqu'à 67 ms) dépassent un peu ceux de
+  `check_env.py` (52 à 61 ms). Un pas de plus de 50 ms fait rouler la voiture avec l'action précédente :
+  à surveiller pendant les vrais entraînements.
+- **Agent déterministe immobile.** Un réseau non entraîné sort une action proche de zéro : le gaz n'est pas
+  positif, la voiture ne bouge pas, et l'épisode s'arrête au pas 80 (70 pas de grâce plus 10 sans
+  progression).
+Limites : le test ne valide pas l'apprentissage. SAC doit encore être validé sur Pendulum-v1 avant de
+tirer une conclusion sur les performances. La troncation à `ep_max_length` est surtout couverte par
+`check_env.py --ep-max-length 100`, car des épisodes de 300 pas sont presque toujours terminés avant par un
+échec.
+
 
 ## Méthode de travail
 
