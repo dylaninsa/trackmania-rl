@@ -150,6 +150,35 @@ uv run python scripts/evaluate.py --policy random --episodes 10 --seed 0
 Limite connue du PID : il réagit à ce qu'il voit sans anticiper, et frôle le mur
 à environ 10 m/s dans le virage serré situé vers 1 659 m.
 
+## Validation de PPO sur Pendulum-v1
+
+PPO (`algos/ppo.py`, `networks/ppo.py`) est validé sur `Pendulum-v1` avant d'être branché sur le jeu.
+Les hyperparamètres sont dans `configs/ppo_pendulum.json`.
+
+```bash
+uv run python scripts/train_ppo.py --config configs/ppo_pendulum.json --seed 0
+```
+
+Le script écrit les logs TensorBoard dans `runs/`, les évaluations dans `results/ppo_pendulum_seed<N>.csv`
+et l'agent final dans `checkpoints/ppo_pendulum_seed<N>.pt`. Une évaluation joue 10 épisodes avec la
+politique déterministe, tous les 5 000 pas.
+
+**Critère de validation :** un retour moyen en évaluation supérieur à −250 sur les 3 graines, soit environ
+1 000 points de mieux que l'agent aléatoire. Il est moins strict que celui de SAC (−200) : PPO, on-policy,
+est connu pour finir moins précisément que SAC sur Pendulum.
+
+**Résultats** (150 000 pas, environ 5 minutes par graine sur CPU) :
+
+| Graine | Retour à 20 000 pas | Retour final |
+|--------|---------------------|--------------|
+| 0 | −352 | −185 ± 107 |
+| 1 | −292 | −212 ± 89 |
+| 2 | −321 | −209 ± 86 |
+
+L'agent aléatoire obtient −1 225 ± 268 sur 10 épisodes. PPO apprend en 20 000 pas environ, puis plafonne
+autour de −210 dès 60 000 pas. Le grand écart-type vient de quelques positions de départ depuis
+lesquelles l'agent met plus longtemps à redresser le pendule.
+
 ## Méthode de travail
 
 - Une branche par fonctionnalité, fusionnée dans `main` par Pull Request.
