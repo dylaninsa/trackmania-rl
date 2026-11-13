@@ -1,0 +1,21 @@
+# Environnement virtuel Python
+MTI881_env/
+venv/
+.venv/
+env/
+
+# Fichiers cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Fichiers macOS (présents dans le dossier initial)
+.DS_Store
+._.DS_Store
+._*
+
+# Logs et checkpoints lourds (optionnel : garder les résultats principaux si souhaité)
+runs/
+*.log
