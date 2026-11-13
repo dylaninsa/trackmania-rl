@@ -214,79 +214,90 @@ class RolloutBuffer:
 class PPOAgent:
     """PPO agent with a Gaussian actor, a critic, an observation normalizer and its rollout buffer.
 
+    The agent works with actions in [-1, 1], like SAC: the training loop rescales them to the bounds of the
+    environment.
+
     Args:
-        state_dim (int): Size of an observation.
-        action_dim (int): Size of an action.
-        action_low (np.ndarray): Lower bounds of the actions.
-        action_high (np.ndarray): Upper bounds of the actions.
-        hidden_dim (int): Number of units of each hidden layer of both networks.
-        lr_actor (float): Learning rate of the actor.
-        lr_critic (float): Learning rate of the critic.
-        gamma (float): Discount factor.
-        gae_lambda (float): GAE parameter.
-        clip_eps (float): Clipping range of the probability ratio.
-        entropy_coef (float): Weight of the entropy bonus in the actor loss.
-        value_coef (float): Weight of the critic loss.
-        max_grad_norm (float): Maximum norm of the gradients of each network.
-        ppo_epochs (int): Number of passes over a rollout.
-        batch_size (int): Number of transitions of a mini-batch.
-        buffer_size (int): Number of transitions of a rollout.
-        normalize_states (bool): Whether to normalize the observations with running statistics.
-        reward_scale (float): Factor applied to the rewards before they are stored.
-        device (str | None): Torch device, or None to use CUDA when available.
+        obs_dim (int): Size of an observation.
+        act_dim (int): Size of an action.
+        config (dict): Hyperparameters ``hidden``, ``lr_actor``, ``lr_critic``, ``gamma``, ``gae_lambda``,
+            ``clip_eps``, ``entropy_coef``, ``value_coef``, ``max_grad_norm``, ``ppo_epochs``, ``batch_size``,
+            ``buffer_size``, ``normalize_states``, ``reward_scale`` and ``device``.
     """
 
-    def __init__(
-        self,
-        state_dim,
-        action_dim,
-        action_low,
-        action_high,
-        hidden_dim=64,
-        lr_actor=3e-4,
-        lr_critic=1e-3,
-        gamma=0.99,
-        gae_lambda=0.95,
-        clip_eps=0.2,
-        entropy_coef=0.01,
-        value_coef=0.5,
-        max_grad_norm=0.5,
-        ppo_epochs=10,
-        batch_size=64,
-        buffer_size=2048,
-        normalize_states=True,
-        reward_scale=0.1,
-        device=None,
-    ):
-        if device is None:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = torch.device(device)
+    def __init__(self, obs_dim, act_dim, config):
+        self.device = torch.device(config["device"])
+        self.gamma = config["gamma"]
+        self.gae_lambda = config["gae_lambda"]
+        self.clip_eps = config["clip_eps"]
+        self.entropy_coef = config["entropy_coef"]
+        self.value_coef = config["value_coef"]
+        self.max_grad_norm = config["max_grad_norm"]
+        self.ppo_epochs = config["ppo_epochs"]
+        self.batch_size = config["batch_size"]
+        self.normalize_states = config["normalize_states"]
+        self.reward_scale = config["reward_scale"]
+        self.lr_actor = config["lr_actor"]
+        self.lr_critic = config["lr_critic"]
 
-        self.state_dim = state_dim
-        self.action_dim = action_dim
-        self.action_low = np.asarray(action_low, dtype=np.float32)
-        self.action_high = np.asarray(action_high, dtype=np.float32)
-        self.max_action = float(np.max(np.abs(self.action_high)))
+        self.state_rms = RunningMeanStd(shape=(obs_dim,))
+        self.actor = ContinuousActor(obs_dim, act_dim, max_action=1.0, hidden_dim=config["hidden"])
+        self.actor.to(self.device)
+        self.critic = Critic(obs_dim, hidden_dim=config["hidden"]).to(self.device)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.lr_actor, eps=1e-5)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.lr_critic, eps=1e-5)
+        self.buffer = RolloutBuffer(config["buffer_size"], obs_dim, act_dim, self.device)
 
-        self.gamma = gamma
-        self.gae_lambda = gae_lambda
-        self.clip_eps = clip_eps
-        self.entropy_coef = entropy_coef
-        self.value_coef = value_coef
-        self.max_grad_norm = max_grad_norm
-        self.ppo_epochs = ppo_epochs
-        self.batch_size = batch_size
-        self.normalize_states = normalize_states
-        self.reward_scale = reward_scale
+    def act(self, obs, deterministic=False):
+        """Chooses an action for one observation, without updating the normalization statistics.
 
-        self.state_rms = RunningMeanStd(shape=(state_dim,))
-        self.actor = ContinuousActor(state_dim, action_dim, max_action=self.max_action,
-                                     hidden_dim=hidden_dim).to(self.device)
-        self.critic = Critic(state_dim, hidden_dim=hidden_dim).to(self.device)
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor, eps=1e-5)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic, eps=1e-5)
-        self.buffer = RolloutBuffer(buffer_size, state_dim, action_dim, self.device)
+        Args:
+            obs (np.ndarray): Raw observation.
+            deterministic (bool): If True, returns the mean action instead of a sample, for evaluation.
+
+        Returns:
+            np.ndarray: Float32 action of shape ``(act_dim,)``, in [-1, 1].
+        """
+        return self.select_action(obs, deterministic=deterministic)[0]
+
+    def reset(self):
+        """Does nothing, because the agent has no state within an episode; it only exists for the common
+        interface with the baseline policies."""
+
+    def store(self, obs, raw_action, log_prob, reward, value, next_obs, terminated, truncated):
+        """Normalizes and stores one transition in the rollout buffer.
+
+        Args:
+            obs (np.ndarray): Raw observation before the action.
+            raw_action (np.ndarray): Action sampled from the Gaussian, as returned by ``select_action``.
+            log_prob (float): Log-probability returned by ``select_action``.
+            reward (float): Reward of the environment, before scaling.
+            value (float): Critic estimate returned by ``select_action``.
+            next_obs (np.ndarray): Raw observation after the action.
+            terminated (bool): Whether the episode terminated after this transition.
+            truncated (bool): Whether the episode was truncated after this transition.
+        """
+        self.buffer.add(
+            state=self.preprocess_state(obs),
+            action=raw_action,
+            log_prob=log_prob,
+            reward=reward * self.reward_scale,
+            value=value,
+            next_value=self.get_value(next_obs),
+            terminated=terminated,
+            truncated=truncated,
+        )
+
+    def set_learning_rate_fraction(self, fraction):
+        """Sets both learning rates to a fraction of their initial value, for a linear decay.
+
+        Args:
+            fraction (float): Fraction of the learning rates given in the configuration.
+        """
+        for group in self.actor_optimizer.param_groups:
+            group["lr"] = self.lr_actor * fraction
+        for group in self.critic_optimizer.param_groups:
+            group["lr"] = self.lr_critic * fraction
 
     def preprocess_state(self, state, update_stats=False):
         """Flattens an observation and normalizes it if ``normalize_states`` is set.
@@ -296,7 +307,7 @@ class PPOAgent:
             update_stats (bool): Whether to add the observation to the running statistics first.
 
         Returns:
-            np.ndarray: Float32 observation of shape ``(state_dim,)``.
+            np.ndarray: Float32 observation of shape ``(obs_dim,)``.
         """
         state_arr = np.asarray(state, dtype=np.float32).ravel()
         if self.normalize_states:
@@ -315,7 +326,7 @@ class PPOAgent:
             update_stats (bool): Whether to add the observation to the normalization statistics.
 
         Returns:
-            tuple[np.ndarray, np.ndarray, float, float]: Action clipped to the bounds of the environment,
+            tuple[np.ndarray, np.ndarray, float, float]: Action clipped to [-1, 1],
                 raw action sampled from the Gaussian (the one stored in the buffer), its log-probability, and
                 the critic estimate of the state.
         """
@@ -325,7 +336,7 @@ class PPOAgent:
         value_tensor = self.critic(state_tensor)
 
         raw_action = action_tensor.squeeze(0).cpu().numpy()
-        env_action = np.clip(raw_action, self.action_low, self.action_high)
+        env_action = np.clip(raw_action, -1.0, 1.0)
         return env_action, raw_action, float(log_prob_tensor.item()), float(value_tensor.item())
 
     @torch.no_grad()
