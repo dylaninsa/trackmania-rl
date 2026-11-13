@@ -1,31 +1,34 @@
-"""
-Module 2 : Les réseaux Acteur et Critique en PyTorch (Contrôle Continu).
+"""Neural networks of PPO: a Gaussian actor with a state-independent standard deviation and a V(s) critic.
 
-Dans un problème à espace d'actions continu :
-- Pendulum-v1 : action de dimension 1 dans [-2.0, +2.0] (couple appliqué au pendule)
-- TMRL (TrackMania) : action de dimension 3 dans [-1.0, +1.0]^3 (gaz, frein, direction)
+Both networks use two hidden layers with Tanh activations and an orthogonal initialization, the usual
+choices for PPO.
 
-L'Acteur ne prédit pas des probabilités discrètes (Softmax), mais les paramètres
-d'une distribution Gaussienne multidimensionnelle :
-    pi_theta(a | s) = N( mu_theta(s), diag(sigma_theta^2) )
-
-Le Critique estime la fonction de valeur d'état V_phi(s) (espérance des récompenses
-futures actualisées depuis l'état s), indispensable pour calculer l'avantage GAE.
+Attributes:
+    LOG_STD_MIN (float): Minimum log standard deviation of the Gaussian distribution.
+    LOG_STD_MAX (float): Maximum log standard deviation of the Gaussian distribution.
 """
 
-from typing import Tuple
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions import Normal
 
+LOG_STD_MIN = -5.0
+LOG_STD_MAX = 2.0
 
-def orthogonal_init(layer: nn.Module, gain: float = np.sqrt(2)) -> nn.Module:
-    """
-    Initialisation orthogonale des poids (bonne pratique standard pour PPO).
-    - Couches cachées : gain = sqrt(2) (adapté à l'activation Tanh)
-    - Sortie de l'Acteur : gain = 0.01 (pour que les premières actions soient proches de 0)
-    - Sortie du Critique : gain = 1.0
+
+def orthogonal_init(layer, gain=np.sqrt(2)):
+    """Initializes a linear layer with orthogonal weights and zero biases.
+
+    The usual gains are ``sqrt(2)`` for the hidden layers, 0.01 for the actor output, so that the first
+    actions are close to the center, and 1.0 for the critic output.
+
+    Args:
+        layer (torch.nn.Module): Layer to initialize. Only ``nn.Linear`` layers are modified.
+        gain (float): Scaling factor of the orthogonal weights.
+
+    Returns:
+        torch.nn.Module: The same layer, initialized.
     """
     if isinstance(layer, nn.Linear):
         nn.init.orthogonal_(layer.weight, gain=gain)
@@ -35,81 +38,91 @@ def orthogonal_init(layer: nn.Module, gain: float = np.sqrt(2)) -> nn.Module:
 
 
 class ContinuousActor(nn.Module):
-    """
-    Réseau Acteur (Politique stochastique continue) : pi_theta(a | s).
+    """Stochastic policy: a diagonal Gaussian whose mean depends on the state.
 
-    Architecture :
-        État s (dim: state_dim)
-          -> Linear(state_dim, hidden_dim) + Tanh
-          -> Linear(hidden_dim, hidden_dim) + Tanh
-          -> mu(s) = max_action * Tanh(Linear(hidden_dim, action_dim))
-        + paramètre appris log_std (dim: action_dim)
+    The mean is ``max_action * tanh(...)``, so it stays within the action bounds. The log standard deviation
+    is a learned parameter that does not depend on the state, clipped to [``LOG_STD_MIN``, ``LOG_STD_MAX``].
+    The sampled actions themselves are not squashed: the caller clips them before sending them to the
+    environment.
+
+    Args:
+        state_dim (int): Size of an observation.
+        action_dim (int): Size of an action.
+        max_action (float): Bound of the mean, the largest absolute value of an action.
+        hidden_dim (int): Number of units of each of the two hidden layers.
+        init_log_std (float): Initial log standard deviation.
     """
 
-    def __init__(
-        self,
-        state_dim: int,
-        action_dim: int,
-        max_action: float = 2.0,
-        hidden_dim: int = 64,
-        init_log_std: float = -0.5,
-    ):
+    def __init__(self, state_dim, action_dim, max_action=2.0, hidden_dim=64, init_log_std=-0.5):
         super().__init__()
         self.action_dim = action_dim
         self.max_action = float(max_action)
-
-        self. trunk = nn.Sequential(
+        self.trunk = nn.Sequential(
             orthogonal_init(nn.Linear(state_dim, hidden_dim), gain=np.sqrt(2)),
             nn.Tanh(),
             orthogonal_init(nn.Linear(hidden_dim, hidden_dim), gain=np.sqrt(2)),
             nn.Tanh(),
         )
         self.mu_head = orthogonal_init(nn.Linear(hidden_dim, action_dim), gain=0.01)
-
-        # Log de l'écart-type (indépendant de l'état, très stable en PPO continu)
         self.log_std = nn.Parameter(torch.full((1, action_dim), init_log_std))
 
-    def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Calcule la moyenne mu(s) et l'écart-type std de la politique Gaussienne.
+    def forward(self, state):
+        """Computes the mean and the standard deviation of the policy.
+
+        Args:
+            state (torch.Tensor): Float32 observations of shape ``(B, state_dim)``.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Mean and standard deviation, both of shape ``(B, action_dim)``.
         """
         features = self.trunk(state)
         mu = self.max_action * torch.tanh(self.mu_head(features))
-        # On borne log_std pour éviter un écart-type trop faible ou explosif
-        log_std = torch.clamp(self.log_std, min=-5.0, max=2.0).expand_as(mu)
+        log_std = torch.clamp(self.log_std, min=LOG_STD_MIN, max=LOG_STD_MAX).expand_as(mu)
         std = torch.exp(log_std)
         return mu, std
 
-    def get_distribution(self, state: torch.Tensor) -> Normal:
-        """Retourne la distribution Gaussienne N(mu(s), std^2)."""
+    def get_distribution(self, state):
+        """Builds the Gaussian distribution of the policy.
+
+        Args:
+            state (torch.Tensor): Float32 observations of shape ``(B, state_dim)``.
+
+        Returns:
+            torch.distributions.Normal: The distribution ``N(mu(s), std^2)``.
+        """
         mu, std = self.forward(state)
         return Normal(mu, std)
 
-    def get_action_and_log_prob(
-        self, state: torch.Tensor, deterministic: bool = False
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Échantillonne une action à partir de l'état s et renvoie (action, log_prob).
-        En mode déterministe (évaluation), renvoie directement la moyenne mu(s).
+    def get_action_and_log_prob(self, state, deterministic=False):
+        """Draws actions and computes their log-probability.
+
+        Args:
+            state (torch.Tensor): Float32 observations of shape ``(B, state_dim)``.
+            deterministic (bool): If True, returns the mean instead of a sample, for evaluation.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Actions of shape ``(B, action_dim)``, and their
+                log-probabilities summed over the action dimensions, of shape ``(B, 1)``.
         """
         dist = self.get_distribution(state)
         if deterministic:
             action = dist.mean
         else:
             action = dist.sample()
-
-        # Somme des log-probabilités sur toutes les dimensions de l'action
-        # (1D sur Pendulum, 3D sur TrackMania : gaz + frein + direction)
         log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
         return action, log_prob
 
-    def evaluate_actions(
-        self, states: torch.Tensor, actions: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Utilisé pendant la mise à jour PPO sur les mini-batchs :
-        Calcule log pi_theta(a | s) et l'entropie H(pi_theta(. | s)) pour des couples
-        (states, actions) déjà collectés dans le RolloutBuffer.
+    def evaluate_actions(self, states, actions):
+        """Computes the log-probability and the entropy of actions already collected.
+
+        Used during the PPO update, to compare the current policy with the one that collected the data.
+
+        Args:
+            states (torch.Tensor): Float32 observations of shape ``(B, state_dim)``.
+            actions (torch.Tensor): Float32 actions of shape ``(B, action_dim)``.
+
+        Returns:
+            tuple[torch.Tensor, torch.Tensor]: Log-probabilities and entropies, both of shape ``(B, 1)``.
         """
         dist = self.get_distribution(states)
         log_probs = dist.log_prob(actions).sum(dim=-1, keepdim=True)
@@ -118,14 +131,14 @@ class ContinuousActor(nn.Module):
 
 
 class Critic(nn.Module):
-    """
-    Réseau Critique (Fonction de valeur d'état) : V_phi(s).
+    """State-value function V(s): the expected discounted return from state ``s`` when following the policy.
 
-    Prédit un scalaire estimant la somme espérée des récompenses actualisées
-    à partir de l'état s : V(s_t) = E[ sum_{k=0..inf} gamma^k * r_{t+k} ].
+    Args:
+        state_dim (int): Size of an observation.
+        hidden_dim (int): Number of units of each of the two hidden layers.
     """
 
-    def __init__(self, state_dim: int, hidden_dim: int = 64):
+    def __init__(self, state_dim, hidden_dim=64):
         super().__init__()
         self.net = nn.Sequential(
             orthogonal_init(nn.Linear(state_dim, hidden_dim), gain=np.sqrt(2)),
@@ -135,5 +148,13 @@ class Critic(nn.Module):
             orthogonal_init(nn.Linear(hidden_dim, 1), gain=1.0),
         )
 
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
+    def forward(self, state):
+        """Estimates V for a batch of observations.
+
+        Args:
+            state (torch.Tensor): Float32 observations of shape ``(B, state_dim)``.
+
+        Returns:
+            torch.Tensor: Values of shape ``(B, 1)``.
+        """
         return self.net(state)

@@ -1,16 +1,9 @@
-"""
-Module 3 : L'algorithme PPO (Proximal Policy Optimization).
+"""Proximal Policy Optimization with a clipped objective and GAE (Schulman et al., 2017).
 
-Référence : Schulman et al. (2017) - "Proximal Policy Optimization Algorithms"
-
-Ce module contient :
-1. RolloutBuffer : Stocke une trajectoire de N pas de temps (on-policy) et calcule
-   les avantages GAE (Generalized Advantage Estimation) ainsi que les retours cibles.
-2. PPOAgent : Regroupe l'Acteur, le Critique, la normalisation d'état et la mise à
-   jour par mini-batchs avec l'objectif clippé L^{CLIP}.
+PPO is on-policy: the agent collects a fixed number of transitions with its current policy, optimizes on
+them for a few epochs, then discards them.
 """
 
-from typing import Any, Dict, Generator, Tuple, Optional
 import numpy as np
 import torch
 import torch.nn as nn
@@ -20,47 +13,60 @@ from networks.ppo import ContinuousActor, Critic
 
 
 class RunningMeanStd:
-    """
-    Calcule de manière incrémentale (algorithme de Welford) la moyenne et la variance
-    des observations pour les normaliser : s_norm = (s - mean) / sqrt(var + eps).
-    
-    C'est essentiel en PPO continu :
-    - Sur Pendulum-v1 : vitesse angulaire dans [-8, 8] vs cos/sin dans [-1, 1].
-    - Sur TMRL : vitesse dans [0, 100+] vs LIDAR vs actions dans [-1, 1].
+    """Running mean and variance of the observations, updated incrementally (parallel Welford algorithm).
+
+    Args:
+        shape (tuple[int, ...]): Shape of an observation.
+        epsilon (float): Initial count, which avoids a division by zero before the first update.
     """
 
-    def __init__(self, shape: Tuple[int, ...], epsilon: float = 1e-4):
+    def __init__(self, shape, epsilon=1e-4):
         self.mean = np.zeros(shape, dtype=np.float64)
         self.var = np.ones(shape, dtype=np.float64)
         self.count = epsilon
 
-    def update(self, x: np.ndarray) -> None:
+    def update(self, x):
+        """Adds a batch of observations to the statistics.
+
+        Args:
+            x (np.ndarray): Observations of shape ``(N, *shape)``.
+        """
         batch_mean = np.mean(x, axis=0)
         batch_var = np.var(x, axis=0)
         batch_count = x.shape[0]
         self._update_from_moments(batch_mean, batch_var, batch_count)
 
-    def _update_from_moments(
-        self, batch_mean: np.ndarray, batch_var: np.ndarray, batch_count: int
-    ) -> None:
+    def _update_from_moments(self, batch_mean, batch_var, batch_count):
+        """Merges the moments of a batch with the current ones.
+
+        Args:
+            batch_mean (np.ndarray): Mean of the batch.
+            batch_var (np.ndarray): Variance of the batch.
+            batch_count (int): Number of observations in the batch.
+        """
         delta = batch_mean - self.mean
         tot_count = self.count + batch_count
-
         new_mean = self.mean + delta * batch_count / tot_count
         m_a = self.var * self.count
         m_b = batch_var * batch_count
         m2 = m_a + m_b + np.square(delta) * self.count * batch_count / tot_count
-        new_var = m2 / tot_count
-
         self.mean = new_mean
-        self.var = new_var
+        self.var = m2 / tot_count
         self.count = tot_count
 
-    def normalize(self, x: np.ndarray, clip: float = 10.0, center: bool = False) -> np.ndarray:
-        """
-        Met à l'échelle l'observation par l'écart-type estimé.
-        Par défaut `center=False` pour préserver le zéro physique des capteurs
-        symétriques (ex: sin(theta)=0 à la verticale sur Pendulum, direction=0 sur TMRL).
+    def normalize(self, x, clip=10.0, center=False):
+        """Scales an observation by the estimated standard deviation, then clips it.
+
+        By default the observation is not centered, so that a physical zero stays at zero, for example
+        ``sin(theta) = 0`` when the pendulum is upright.
+
+        Args:
+            x (np.ndarray): Observation to normalize.
+            clip (float): Bound of the normalized values.
+            center (bool): If True, also subtracts the mean.
+
+        Returns:
+            np.ndarray: Float32 normalized observation.
         """
         if center:
             norm_x = (x - self.mean) / np.sqrt(self.var + 1e-8)
@@ -68,35 +74,47 @@ class RunningMeanStd:
             norm_x = x / np.sqrt(self.var + 1e-8)
         return np.clip(norm_x, -clip, clip).astype(np.float32)
 
-    def state_dict(self) -> Dict[str, Any]:
-        return {
-            "mean": self.mean,
-            "var": self.var,
-            "count": self.count,
-        }
+    def state_dict(self):
+        """Returns the statistics, for checkpoints.
 
-    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        Returns:
+            dict: ``mean``, ``var`` and ``count``.
+        """
+        return {"mean": self.mean, "var": self.var, "count": self.count}
+
+    def load_state_dict(self, state_dict):
+        """Restores statistics returned by ``state_dict``.
+
+        Args:
+            state_dict (dict): ``mean``, ``var`` and ``count``.
+        """
         self.mean = state_dict["mean"]
         self.var = state_dict["var"]
         self.count = state_dict["count"]
 
 
 class RolloutBuffer:
-    """
-    Mémoire tampon On-Policy pour PPO.
-    Contrairement à SAC (Off-Policy, qui garde un immense Replay Buffer), PPO collecte
-    un horizon fixe de `buffer_size` transitions avec la politique courante, effectue
-    K époques d'optimisation, puis vide le buffer (`clear`) avant la collecte suivante.
+    """On-policy buffer holding the transitions of one rollout, and their advantages and returns.
+
+    The value of the next state is stored with each transition, so that the advantages are correct even
+    when the rollout stops in the middle of an episode.
+
+    Args:
+        buffer_size (int): Number of transitions of a rollout.
+        state_dim (int): Size of an observation.
+        action_dim (int): Size of an action.
+        device (torch.device): Device of the tensors returned by ``get_minibatches``.
     """
 
-    def __init__(self, buffer_size: int, state_dim: int, action_dim: int, device: torch.device):
+    def __init__(self, buffer_size, state_dim, action_dim, device):
         self.buffer_size = buffer_size
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.device = device
         self.clear()
 
-    def clear(self) -> None:
+    def clear(self):
+        """Empties the buffer."""
         self.states = np.zeros((self.buffer_size, self.state_dim), dtype=np.float32)
         self.actions = np.zeros((self.buffer_size, self.action_dim), dtype=np.float32)
         self.log_probs = np.zeros((self.buffer_size, 1), dtype=np.float32)
@@ -105,26 +123,28 @@ class RolloutBuffer:
         self.next_values = np.zeros((self.buffer_size, 1), dtype=np.float32)
         self.terminateds = np.zeros((self.buffer_size, 1), dtype=np.float32)
         self.dones = np.zeros((self.buffer_size, 1), dtype=np.float32)
-
         self.advantages = np.zeros((self.buffer_size, 1), dtype=np.float32)
         self.returns = np.zeros((self.buffer_size, 1), dtype=np.float32)
         self.ptr = 0
 
-    def add(
-        self,
-        state: np.ndarray,
-        action: np.ndarray,
-        log_prob: float,
-        reward: float,
-        value: float,
-        next_value: float,
-        terminated: bool,
-        truncated: bool,
-    ) -> None:
-        """Ajoute une transition (s_t, a_t, log_pi, r_t, V(s_t), V(s_{t+1}), terminated, done)."""
-        if self.ptr >= self.buffer_size:
-            raise RuntimeError("RolloutBuffer est plein ! Appelez update() puis clear().")
+    def add(self, state, action, log_prob, reward, value, next_value, terminated, truncated):
+        """Stores one transition.
 
+        Args:
+            state (np.ndarray): Normalized observation before the action.
+            action (np.ndarray): Action sampled from the policy, before clipping.
+            log_prob (float): Log-probability of the action under the policy that collected it.
+            reward (float): Scaled reward.
+            value (float): Critic estimate of the state.
+            next_value (float): Critic estimate of the next state.
+            terminated (bool): Whether the episode terminated after this transition.
+            truncated (bool): Whether the episode was truncated after this transition.
+
+        Raises:
+            RuntimeError: If the buffer is full.
+        """
+        if self.ptr >= self.buffer_size:
+            raise RuntimeError("The rollout buffer is full: call update() before adding transitions.")
         self.states[self.ptr] = state
         self.actions[self.ptr] = action
         self.log_probs[self.ptr] = log_prob
@@ -135,18 +155,17 @@ class RolloutBuffer:
         self.dones[self.ptr] = float(terminated or truncated)
         self.ptr += 1
 
-    def compute_returns_and_advantages(self, gamma: float = 0.99, gae_lambda: float = 0.95) -> None:
-        """
-        Calcule l'estimation d'avantage généralisé (GAE - Schulman et al., 2015) :
-            delta_t = r_t + gamma * (1 - terminated_t) * V(s_{t+1}) - V(s_t)
-            A_t = delta_t + gamma * lambda * (1 - done_t) * A_{t+1}
-            R_t = A_t + V(s_t)
+    def compute_returns_and_advantages(self, gamma=0.99, gae_lambda=0.95):
+        """Computes the advantages with GAE (Schulman et al., 2015), and the returns used by the critic.
 
-        Note importante (Pendulum-v1 & TMRL) :
-        - Si un épisode se termine par limite de temps (`truncated=True`, `terminated=False`),
-          l'état final n'est pas un crash : on bootstrappe donc avec V(s_{t+1}).
-        - En revanche, comme l'environnement est réinitialisé au pas suivant, on coupe
-          la propagation récursive de GAE avec `(1 - done_t)`.
+        ``delta_t = r_t + gamma * (1 - terminated_t) * V(s_{t+1}) - V(s_t)``,
+        ``A_t = delta_t + gamma * lambda * (1 - done_t) * A_{t+1}`` and ``R_t = A_t + V(s_t)``.
+        After a truncation the next state is still bootstrapped, since the episode could have continued,
+        but the recursion is cut, since the next transition belongs to another episode.
+
+        Args:
+            gamma (float): Discount factor.
+            gae_lambda (float): Trade-off between bias (0) and variance (1) of the advantages.
         """
         gae = 0.0
         for step in reversed(range(self.ptr)):
@@ -157,27 +176,31 @@ class RolloutBuffer:
             )
             gae = delta + gamma * gae_lambda * (1.0 - self.dones[step]) * gae
             self.advantages[step] = gae
-
         self.returns[: self.ptr] = self.advantages[: self.ptr] + self.values[: self.ptr]
 
-    def get_minibatches(
-        self, batch_size: int
-    ) -> Generator[Tuple[torch.Tensor, ...], None, None]:
-        """Génère des mini-batchs mélangés aléatoirement pour l'optimisation PPO."""
-        indices = np.random.permutation(self.ptr)
+    def get_minibatches(self, batch_size):
+        """Yields the stored transitions in shuffled mini-batches.
 
+        The advantages are normalized over the whole rollout.
+
+        Args:
+            batch_size (int): Number of transitions of a mini-batch.
+
+        Yields:
+            tuple[torch.Tensor, ...]: States, actions, old log-probabilities, advantages, returns and old
+                values of the mini-batch.
+        """
+        indices = np.random.permutation(self.ptr)
         states_t = torch.as_tensor(self.states[: self.ptr], device=self.device)
         actions_t = torch.as_tensor(self.actions[: self.ptr], device=self.device)
         old_log_probs_t = torch.as_tensor(self.log_probs[: self.ptr], device=self.device)
         advantages_t = torch.as_tensor(self.advantages[: self.ptr], device=self.device)
         returns_t = torch.as_tensor(self.returns[: self.ptr], device=self.device)
         old_values_t = torch.as_tensor(self.values[: self.ptr], device=self.device)
-
-        # Normalisation des avantages sur le rollout complet (stabilise fortement PPO)
         advantages_t = (advantages_t - advantages_t.mean()) / (advantages_t.std() + 1e-8)
 
         for start_idx in range(0, self.ptr, batch_size):
-            batch_idx = indices[start_idx : start_idx + batch_size]
+            batch_idx = indices[start_idx: start_idx + batch_size]
             yield (
                 states_t[batch_idx],
                 actions_t[batch_idx],
@@ -189,31 +212,51 @@ class RolloutBuffer:
 
 
 class PPOAgent:
-    """
-    Agent PPO complet pour le contrôle continu (Pendulum-v1 et TrackMania TMRL).
+    """PPO agent with a Gaussian actor, a critic, an observation normalizer and its rollout buffer.
+
+    Args:
+        state_dim (int): Size of an observation.
+        action_dim (int): Size of an action.
+        action_low (np.ndarray): Lower bounds of the actions.
+        action_high (np.ndarray): Upper bounds of the actions.
+        hidden_dim (int): Number of units of each hidden layer of both networks.
+        lr_actor (float): Learning rate of the actor.
+        lr_critic (float): Learning rate of the critic.
+        gamma (float): Discount factor.
+        gae_lambda (float): GAE parameter.
+        clip_eps (float): Clipping range of the probability ratio.
+        entropy_coef (float): Weight of the entropy bonus in the actor loss.
+        value_coef (float): Weight of the critic loss.
+        max_grad_norm (float): Maximum norm of the gradients of each network.
+        ppo_epochs (int): Number of passes over a rollout.
+        batch_size (int): Number of transitions of a mini-batch.
+        buffer_size (int): Number of transitions of a rollout.
+        normalize_states (bool): Whether to normalize the observations with running statistics.
+        reward_scale (float): Factor applied to the rewards before they are stored.
+        device (str | None): Torch device, or None to use CUDA when available.
     """
 
     def __init__(
         self,
-        state_dim: int,
-        action_dim: int,
-        action_low: np.ndarray,
-        action_high: np.ndarray,
-        hidden_dim: int = 64,
-        lr_actor: float = 3e-4,
-        lr_critic: float = 1e-3,
-        gamma: float = 0.99,
-        gae_lambda: float = 0.95,
-        clip_eps: float = 0.2,
-        entropy_coef: float = 0.01,
-        value_coef: float = 0.5,
-        max_grad_norm: float = 0.5,
-        ppo_epochs: int = 10,
-        batch_size: int = 64,
-        buffer_size: int = 2048,
-        normalize_states: bool = True,
-        reward_scale: float = 0.1,
-        device: Optional[str] = None,
+        state_dim,
+        action_dim,
+        action_low,
+        action_high,
+        hidden_dim=64,
+        lr_actor=3e-4,
+        lr_critic=1e-3,
+        gamma=0.99,
+        gae_lambda=0.95,
+        clip_eps=0.2,
+        entropy_coef=0.01,
+        value_coef=0.5,
+        max_grad_norm=0.5,
+        ppo_epochs=10,
+        batch_size=64,
+        buffer_size=2048,
+        normalize_states=True,
+        reward_scale=0.1,
+        device=None,
     ):
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -226,7 +269,6 @@ class PPOAgent:
         self.action_high = np.asarray(action_high, dtype=np.float32)
         self.max_action = float(np.max(np.abs(self.action_high)))
 
-        # Hyperparamètres PPO
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.clip_eps = clip_eps
@@ -238,36 +280,24 @@ class PPOAgent:
         self.normalize_states = normalize_states
         self.reward_scale = reward_scale
 
-        # Normalisation en ligne des observations
         self.state_rms = RunningMeanStd(shape=(state_dim,))
-
-        # Réseaux Acteur et Critique (Module 2)
-        self.actor = ContinuousActor(
-            state_dim=state_dim,
-            action_dim=action_dim,
-            max_action=self.max_action,
-            hidden_dim=hidden_dim,
-        ).to(self.device)
-
-        self.critic = Critic(
-            state_dim=state_dim,
-            hidden_dim=hidden_dim,
-        ).to(self.device)
-
-        # Optimiseurs Adam
+        self.actor = ContinuousActor(state_dim, action_dim, max_action=self.max_action,
+                                     hidden_dim=hidden_dim).to(self.device)
+        self.critic = Critic(state_dim, hidden_dim=hidden_dim).to(self.device)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor, eps=1e-5)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic, eps=1e-5)
+        self.buffer = RolloutBuffer(buffer_size, state_dim, action_dim, self.device)
 
-        # Mémoire tampon On-Policy
-        self.buffer = RolloutBuffer(
-            buffer_size=buffer_size,
-            state_dim=state_dim,
-            action_dim=action_dim,
-            device=self.device,
-        )
+    def preprocess_state(self, state, update_stats=False):
+        """Flattens an observation and normalizes it if ``normalize_states`` is set.
 
-    def preprocess_state(self, state: np.ndarray, update_stats: bool = False) -> np.ndarray:
-        """Normalise l'état si l'option `normalize_states` est activée."""
+        Args:
+            state (np.ndarray): Raw observation.
+            update_stats (bool): Whether to add the observation to the running statistics first.
+
+        Returns:
+            np.ndarray: Float32 observation of shape ``(state_dim,)``.
+        """
         state_arr = np.asarray(state, dtype=np.float32).ravel()
         if self.normalize_states:
             if update_stats:
@@ -276,53 +306,55 @@ class PPOAgent:
         return state_arr
 
     @torch.no_grad()
-    def select_action(
-        self, state: np.ndarray, deterministic: bool = False, update_stats: bool = False
-    ) -> Tuple[np.ndarray, np.ndarray, float, float]:
-        """
-        Sélectionne une action à partir de l'état courant.
+    def select_action(self, state, deterministic=False, update_stats=False):
+        """Chooses an action for one observation, without computing gradients.
+
+        Args:
+            state (np.ndarray): Raw observation.
+            deterministic (bool): If True, returns the mean action instead of a sample, for evaluation.
+            update_stats (bool): Whether to add the observation to the normalization statistics.
 
         Returns:
-            env_action: Action clippée dans [action_low, action_high] à envoyer à Gymnasium.
-            raw_action: Action brute échantillonnée de la Gaussienne (stockée dans le buffer).
-            log_prob: Log-probabilité log pi_theta(raw_action | s).
-            value: Estimation V_phi(s) du Critique.
+            tuple[np.ndarray, np.ndarray, float, float]: Action clipped to the bounds of the environment,
+                raw action sampled from the Gaussian (the one stored in the buffer), its log-probability, and
+                the critic estimate of the state.
         """
         norm_state = self.preprocess_state(state, update_stats=update_stats)
         state_tensor = torch.as_tensor(norm_state, dtype=torch.float32, device=self.device).unsqueeze(0)
-
-        action_tensor, log_prob_tensor = self.actor.get_action_and_log_prob(
-            state_tensor, deterministic=deterministic
-        )
+        action_tensor, log_prob_tensor = self.actor.get_action_and_log_prob(state_tensor, deterministic)
         value_tensor = self.critic(state_tensor)
 
         raw_action = action_tensor.squeeze(0).cpu().numpy()
-        # On clippe l'action envoyée à l'environnement pour respecter ses bornes physiques
         env_action = np.clip(raw_action, self.action_low, self.action_high)
-        log_prob = float(log_prob_tensor.item())
-        value = float(value_tensor.item())
-
-        return env_action, raw_action, log_prob, value
+        return env_action, raw_action, float(log_prob_tensor.item()), float(value_tensor.item())
 
     @torch.no_grad()
-    def get_value(self, state: np.ndarray) -> float:
-        """Calcule uniquement V_phi(s) (utile pour bootstrapper le dernier état)."""
+    def get_value(self, state):
+        """Computes the critic estimate of one observation.
+
+        Args:
+            state (np.ndarray): Raw observation.
+
+        Returns:
+            float: Estimate of V(s).
+        """
         norm_state = self.preprocess_state(state, update_stats=False)
         state_tensor = torch.as_tensor(norm_state, dtype=torch.float32, device=self.device).unsqueeze(0)
         return float(self.critic(state_tensor).item())
 
-    def update(self) -> Dict[str, float]:
+    def update(self):
+        """Optimizes the actor and the critic on the current rollout, then empties the buffer.
+
+        For ``ppo_epochs`` passes over shuffled mini-batches, the actor minimizes the clipped surrogate loss
+        ``-min(ratio * A, clip(ratio, 1 - eps, 1 + eps) * A)`` minus the entropy bonus, and the critic
+        minimizes the mean squared error between ``V(s)`` and the GAE returns. Each network has its own
+        optimizer and its gradients are clipped to ``max_grad_norm``.
+
+        Returns:
+            dict: ``actor_loss``, ``critic_loss``, ``entropy``, ``approx_kl``, ``clip_fraction`` and
+                ``policy_std``, averaged over the mini-batches, as floats.
         """
-        Exécute la mise à jour PPO sur les données collectées dans le RolloutBuffer :
-        1. Calcule les avantages GAE et les retours cibles R_t.
-        2. Sur `ppo_epochs` époques, découpe le buffer en mini-batchs et optimise :
-           - L'Acteur via l'objectif clippé L^{CLIP} + bonus d'entropie
-           - Le Critique via l'erreur quadratique moyenne (MSE) entre V_phi(s) et R_t
-        3. Vide le RolloutBuffer.
-        """
-        self.buffer.compute_returns_and_advantages(
-            gamma=self.gamma, gae_lambda=self.gae_lambda
-        )
+        self.buffer.compute_returns_and_advantages(gamma=self.gamma, gae_lambda=self.gae_lambda)
 
         actor_losses = []
         critic_losses = []
@@ -331,48 +363,30 @@ class PPOAgent:
         clip_fractions = []
 
         for _ in range(self.ppo_epochs):
-            for (
-                states,
-                actions,
-                old_log_probs,
-                advantages,
-                returns,
-                old_values,
-            ) in self.buffer.get_minibatches(self.batch_size):
-
-                # 1. Évaluation des actions sous la politique actuelle pi_theta
+            for states, actions, old_log_probs, advantages, returns, old_values in \
+                    self.buffer.get_minibatches(self.batch_size):
                 new_log_probs, entropy = self.actor.evaluate_actions(states, actions)
                 new_values = self.critic(states)
 
-                # 2. Ratio de probabilité : r_t(theta) = pi_theta(a|s) / pi_theta_old(a|s)
                 log_ratio = new_log_probs - old_log_probs
                 ratio = torch.exp(log_ratio)
-
-                # 3. Objectif clippé PPO : L^{CLIP}
                 surr1 = ratio * advantages
                 surr2 = torch.clamp(ratio, 1.0 - self.clip_eps, 1.0 + self.clip_eps) * advantages
                 actor_loss = -torch.min(surr1, surr2).mean()
-
-                # Bonus d'entropie pour favoriser l'exploration
                 entropy_loss = entropy.mean()
                 total_actor_loss = actor_loss - self.entropy_coef * entropy_loss
-
-                # 4. Perte du Critique : MSE(V_phi(s), R_t)
                 critic_loss = nn.functional.mse_loss(new_values, returns)
 
-                # 5. Rétropropagation de l'Acteur
                 self.actor_optimizer.zero_grad()
                 total_actor_loss.backward()
                 nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
                 self.actor_optimizer.step()
 
-                # 6. Rétropropagation du Critique
                 self.critic_optimizer.zero_grad()
                 (self.value_coef * critic_loss).backward()
                 nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
                 self.critic_optimizer.step()
 
-                # Métriques de diagnostic (pour TensorBoard et le suivi)
                 with torch.no_grad():
                     approx_kl = ((ratio - 1.0) - log_ratio).mean().item()
                     clip_frac = (torch.abs(ratio - 1.0) > self.clip_eps).float().mean().item()
@@ -383,7 +397,6 @@ class PPOAgent:
                 approx_kls.append(approx_kl)
                 clip_fractions.append(clip_frac)
 
-        # On vide le buffer On-Policy après la mise à jour
         self.buffer.clear()
 
         return {
@@ -395,8 +408,12 @@ class PPOAgent:
             "policy_std": float(torch.exp(self.actor.log_std).mean().item()),
         }
 
-    def save(self, filepath: str) -> None:
-        """Sauvegarde les poids de l'Acteur, du Critique et les statistiques de normalisation."""
+    def save(self, filepath):
+        """Saves the networks, the optimizers and the normalization statistics to a single file.
+
+        Args:
+            filepath (str | pathlib.Path): Destination ``.pt`` file.
+        """
         checkpoint = {
             "actor_state_dict": self.actor.state_dict(),
             "critic_state_dict": self.critic.state_dict(),
@@ -407,8 +424,12 @@ class PPOAgent:
         }
         torch.save(checkpoint, filepath)
 
-    def load(self, filepath: str) -> None:
-        """Charge un checkpoint sauvegardé."""
+    def load(self, filepath):
+        """Restores an agent saved with ``save``.
+
+        Args:
+            filepath (str | pathlib.Path): ``.pt`` file written by ``save``.
+        """
         checkpoint = torch.load(filepath, map_location=self.device, weights_only=False)
         self.actor.load_state_dict(checkpoint["actor_state_dict"])
         self.critic.load_state_dict(checkpoint["critic_state_dict"])
