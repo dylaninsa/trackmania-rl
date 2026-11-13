@@ -22,6 +22,7 @@ CONFIG = {
     "ppo_epochs": 2,
     "batch_size": 8,
     "buffer_size": 32,
+    "ep_max_length": 10,
     "normalize_states": True,
     "reward_scale": 0.1,
     "device": "cpu",
@@ -42,15 +43,16 @@ def make_agent(seed=0):
     return PPOAgent(OBS_DIM, ACT_DIM, CONFIG)
 
 
-def fill_rollout(agent, seed=0):
+def fill_rollout(agent, seed=0, steps=CONFIG["buffer_size"]):
     """Fills the rollout buffer of the agent with random transitions.
 
     Args:
         agent (PPOAgent): Agent whose buffer is filled.
         seed (int): Seed of the random observations and rewards.
+        steps (int): Number of transitions to add.
     """
     rng = np.random.default_rng(seed)
-    for _ in range(CONFIG["buffer_size"]):
+    for _ in range(steps):
         obs = rng.normal(size=OBS_DIM).astype(np.float32)
         _, raw_action, log_prob, value = agent.select_action(obs, update_stats=True)
         next_obs = rng.normal(size=OBS_DIM).astype(np.float32)
@@ -198,6 +200,28 @@ def test_store_scales_reward_and_keeps_raw_action():
     np.testing.assert_array_equal(agent.buffer.actions[0], raw_action)
     assert agent.buffer.next_values[0, 0] == pytest.approx(agent.get_value(next_obs))
     assert (agent.buffer.terminateds[0, 0], agent.buffer.dones[0, 0]) == (0.0, 1.0)
+
+
+def test_ready_to_update_after_buffer_size_transitions():
+    agent = make_agent()
+
+    fill_rollout(agent, steps=CONFIG["buffer_size"] - 1)
+    before = agent.ready_to_update()
+    fill_rollout(agent, steps=1)
+
+    assert not before
+    assert agent.ready_to_update()
+
+
+def test_buffer_accepts_one_more_episode_beyond_buffer_size():
+    agent = make_agent()
+
+    fill_rollout(agent, steps=CONFIG["buffer_size"] + CONFIG["ep_max_length"])
+    logs = agent.update()
+
+    assert all(np.isfinite(value) for value in logs.values())
+    with pytest.raises(RuntimeError):
+        fill_rollout(agent, steps=CONFIG["buffer_size"] + CONFIG["ep_max_length"] + 1)
 
 
 def test_update_returns_contract_keys_and_empties_buffer():

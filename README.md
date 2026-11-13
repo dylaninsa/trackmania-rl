@@ -171,12 +171,13 @@ est connu pour finir moins précisément que SAC sur Pendulum.
 
 | Graine | Retour à 20 000 pas | Retour final |
 |--------|---------------------|--------------|
-| 0 | −352 | −185 ± 107 |
-| 1 | −292 | −212 ± 89 |
-| 2 | −321 | −209 ± 86 |
+| 0 | −323 | −226 ± 139 |
+| 1 | −335 | −210 ± 88 |
+| 2 | −368 | −227 ± 86 |
 
 L'agent aléatoire obtient −1 225 ± 268 sur 10 épisodes. PPO apprend en 20 000 pas environ, puis plafonne
-autour de −210 dès 60 000 pas. Le grand écart-type vient de quelques positions de départ depuis
+entre −210 et −230. L'agent n'est mis à jour qu'en fin d'épisode, une fois au moins `buffer_size` pas
+collectés, soit tous les 2 200 pas sur Pendulum. Le grand écart-type vient de quelques positions de départ depuis
 lesquelles l'agent met plus longtemps à redresser le pendule.
 
 ## Méthode de travail

@@ -222,7 +222,7 @@ class PPOAgent:
         act_dim (int): Size of an action.
         config (dict): Hyperparameters ``hidden``, ``lr_actor``, ``lr_critic``, ``gamma``, ``gae_lambda``,
             ``clip_eps``, ``entropy_coef``, ``value_coef``, ``max_grad_norm``, ``ppo_epochs``, ``batch_size``,
-            ``buffer_size``, ``normalize_states``, ``reward_scale`` and ``device``.
+            ``buffer_size``, ``normalize_states``, ``reward_scale``, ``ep_max_length`` and ``device``.
     """
 
     def __init__(self, obs_dim, act_dim, config):
@@ -246,7 +246,10 @@ class PPOAgent:
         self.critic = Critic(obs_dim, hidden_dim=config["hidden"]).to(self.device)
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.lr_actor, eps=1e-5)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.lr_critic, eps=1e-5)
-        self.buffer = RolloutBuffer(config["buffer_size"], obs_dim, act_dim, self.device)
+        self.rollout_steps = config["buffer_size"]
+        self.buffer = RolloutBuffer(
+            config["buffer_size"] + config["ep_max_length"], obs_dim, act_dim, self.device
+        )
 
     def act(self, obs, deterministic=False):
         """Chooses an action for one observation, without updating the normalization statistics.
@@ -287,6 +290,17 @@ class PPOAgent:
             terminated=terminated,
             truncated=truncated,
         )
+
+    def ready_to_update(self):
+        """Tells whether the rollout holds enough transitions for an update.
+
+        The training loop calls it at the end of each episode only, so that no update interrupts an episode;
+        the buffer therefore holds up to ``ep_max_length`` transitions more than ``buffer_size``.
+
+        Returns:
+            bool: True if at least ``buffer_size`` transitions have been collected.
+        """
+        return self.buffer.ptr >= self.rollout_steps
 
     def set_learning_rate_fraction(self, fraction):
         """Sets both learning rates to a fraction of their initial value, for a linear decay.

@@ -3,6 +3,7 @@
     "seed": 0,
     "total_steps": 150000,
     "buffer_size": 2048,
+    "ep_max_length": 200,
     "batch_size": 64,
     "ppo_epochs": 10,
     "eval_every": 5000,
