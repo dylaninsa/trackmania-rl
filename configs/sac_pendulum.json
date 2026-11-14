@@ -11,5 +11,7 @@
   "lr": 0.0003,
   "gamma": 0.99,
   "tau": 0.005,
-  "device": "cpu"
+  "device": "cpu",
+  "ep_max_length": 200,
+  "updates_per_step": 1.0
 }

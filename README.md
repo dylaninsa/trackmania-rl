@@ -180,6 +180,34 @@ entre −210 et −230. L'agent n'est mis à jour qu'en fin d'épisode, une fois
 collectés, soit tous les 2 200 pas sur Pendulum. Le grand écart-type vient de quelques positions de départ depuis
 lesquelles l'agent met plus longtemps à redresser le pendule.
 
+## Validation de SAC sur Pendulum-v1
+
+SAC (`algos/sac.py`, `networks/sac.py`, `algos/replay_buffer.py`) est validé de la même façon. Les
+hyperparamètres sont dans `configs/sac_pendulum.json`.
+
+```bash
+uv run python scripts/train_sac.py --config configs/sac_pendulum.json --seed 0
+```
+
+Les 1 000 premiers pas sont joués au hasard pour remplir le buffer. Ensuite, à la fin de chaque épisode,
+l'agent fait autant de mises à jour que l'épisode a duré de pas (`updates_per_step` = 1). Les sorties suivent
+le même schéma que pour PPO : `results/sac_pendulum_seed<N>.csv` et `checkpoints/sac_pendulum_seed<N>.pt`,
+avec une évaluation de 10 épisodes tous les 2 000 pas.
+
+**Critère de validation :** un retour moyen en évaluation supérieur à −200 sur les 3 graines.
+
+**Résultats** (20 000 pas) :
+
+| Graine | Retour à 4 000 pas | Retour final |
+|--------|--------------------|--------------|
+| 0 | −236 | −169 ± 92 |
+| 1 | −261 | −192 ± 76 |
+| 2 | −249 | −191 ± 75 |
+
+SAC apprend en 4 000 à 8 000 pas, soit environ 5 fois moins de pas que PPO, puis reste stable. Cet écart
+vient de ce que SAC est off-policy : il réutilise chaque transition du buffer de nombreuses fois, alors que
+PPO jette son rollout après chaque mise à jour.
+
 ## Méthode de travail
 
 - Une branche par fonctionnalité, fusionnée dans `main` par Pull Request.
