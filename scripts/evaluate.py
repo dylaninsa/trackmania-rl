@@ -12,32 +12,70 @@ Examples:
 
         uv run python scripts/evaluate.py --policy random --episodes 10 --seed 0
 
+    Evaluate a trained PPO agent::
+
+        uv run python scripts/evaluate.py --policy ppo --config configs/ppo_trackmania.json --checkpoint checkpoints/ppo_trackmania_seed0.pt --episodes 5
+
 Attributes:
     TIME_STEP (float): Duration of a step in seconds, used to compute the finish time.
 """
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
+from algos.ppo import PPOAgent
 from baselines.policies import PIDPolicy, RandomPolicy
 from envs.trackmania import make_env
 
 TIME_STEP = 0.05
 
 
-def make_policy(name, seed):
+class PPOPolicy:
+    """Deterministic policy of a trained PPO agent, with the interface of the baselines.
+
+    Args:
+        agent (PPOAgent): Trained agent.
+    """
+
+    def __init__(self, agent):
+        self.agent = agent
+
+    def reset(self):
+        """Resets the agent at the start of an episode."""
+        self.agent.reset()
+
+    def act(self, obs):
+        """Chooses the mean action of the policy.
+
+        Args:
+            obs (np.ndarray): Observation of size 83.
+
+        Returns:
+            np.ndarray: Action in [-1, 1].
+        """
+        return self.agent.act(obs, deterministic=True)
+
+
+def make_policy(args, env):
     """Creates the policy to evaluate.
 
     Args:
-        name (str): ``"random"`` or ``"pid"``.
-        seed (int | None): Seed of the random agent. The PID heuristic is deterministic and ignores it.
+        args (argparse.Namespace): Command line arguments: ``policy``, ``seed``, and for PPO ``config`` and
+            ``checkpoint``.
+        env (gymnasium.Env): Environment, whose spaces give the dimensions of the PPO networks.
 
     Returns:
-        RandomPolicy | PIDPolicy: The policy.
+        RandomPolicy | PIDPolicy | PPOPolicy: The policy.
     """
-    if name == "random":
-        return RandomPolicy(seed)
+    if args.policy == "random":
+        return RandomPolicy(args.seed)
+    if args.policy == "ppo":
+        config = json.loads(Path(args.config).read_text(encoding="utf-8"))
+        agent = PPOAgent(env.observation_space.shape[0], env.action_space.shape[0], config)
+        agent.load(args.checkpoint)
+        return PPOPolicy(agent)
     return PIDPolicy()
 
 
@@ -46,7 +84,7 @@ def run_episode(env, policy):
 
     Args:
         env (gymnasium.Env): Environment created by ``make_env``.
-        policy (RandomPolicy | PIDPolicy): Policy exposing ``reset()`` and ``act(obs)``.
+        policy (RandomPolicy | PIDPolicy | PPOPolicy): Policy exposing ``reset()`` and ``act(obs)``.
 
     Returns:
         dict: ``return`` (sum of the rewards), ``steps``, ``distance_m`` and ``progress`` at the last step,
@@ -78,24 +116,31 @@ def main():
 
     The default output file is ``results/<policy>.csv``, or ``results/random_seed<seed>.csv`` for the random
     agent with a seed, so that the results of different seeds are not overwritten.
+    ``results/eval_<checkpoint>.csv`` for a PPO agent.
     """
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--policy", choices=["random", "pid"], required=True)
+    parser.add_argument("--policy", choices=["random", "pid", "ppo"], required=True)
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--seed", type=int, default=None, help="graine de l'agent aléatoire (ignorée par le PID)")
     parser.add_argument("--ep-max-length", type=int, default=3000)
+    parser.add_argument("--config", default=None, help="configuration d'entraînement de l'agent PPO")
+    parser.add_argument("--checkpoint", default=None, help="fichier .pt de l'agent PPO")
     parser.add_argument("--output", default=None, help="fichier CSV de sortie")
     args = parser.parse_args()
+    if args.policy == "ppo" and (args.config is None or args.checkpoint is None):
+        parser.error("--policy ppo demande --config et --checkpoint")
 
     if args.output is not None:
         output_file = Path(args.output)
+    elif args.policy == "ppo":
+        output_file = Path("results") / f"eval_{Path(args.checkpoint).stem}.csv"
     elif args.policy == "random" and args.seed is not None:
         output_file = Path("results") / f"random_seed{args.seed}.csv"
     else:
         output_file = Path("results") / f"{args.policy}.csv"
 
     env = make_env(ep_max_length=args.ep_max_length)
-    policy = make_policy(args.policy, args.seed)
+    policy = make_policy(args, env)
 
     results = []
     for episode in range(1, args.episodes + 1):

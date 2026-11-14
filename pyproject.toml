@@ -10,6 +10,7 @@ dependencies = [
     "torch",
     "tensorboard",
     "tmrl",
+    "matplotlib>=3.11.2",
 ]
 
 [dependency-groups]
