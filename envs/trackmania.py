@@ -20,6 +20,7 @@ Attributes:
     DEFAULT_REWARD_PATH (pathlib.Path): Demonstration trajectory of the tmrl-test track.
 """
 
+import time
 from pathlib import Path
 
 import gymnasium
@@ -38,6 +39,42 @@ ACTIONS = slice(77, 83)
 SPEED_SCALE = 100.0
 LIDAR_SCALE = 500.0
 DEFAULT_REWARD_PATH = Path(__file__).resolve().parents[1] / "data" / "reward" / "tmrl-test.pkl"
+GAMEPAD_ATTEMPTS = 5
+GAMEPAD_RETRY_DELAY = 1.0
+
+
+def use_retrying_gamepad():
+    """Makes TMRL create its virtual gamepad with several attempts.
+
+    ViGEmBus gives up after about 1 s when Windows is slow to install the virtual controller, which often
+    happens on the first attempt after a while without one. vgamepad then raises "The virtual device could
+    not connect to ViGEmBus", while a second attempt succeeds. TMRL looks up ``vgamepad.VX360Gamepad`` when
+    it initializes, so replacing it there is enough.
+    """
+    import vgamepad
+    import vgamepad.win.vigem_client as vcli
+
+    if getattr(vgamepad.VX360Gamepad, "retries", False):
+        return
+
+    class RetryingX360Gamepad(vgamepad.VX360Gamepad):
+        retries = True
+
+        def __init__(self):
+            for attempt in range(1, GAMEPAD_ATTEMPTS + 1):
+                try:
+                    super().__init__()
+                    return
+                except AssertionError:
+                    if attempt == GAMEPAD_ATTEMPTS:
+                        raise
+                    # Frees the target that failed to attach before allocating a new one.
+                    vcli.vigem_target_remove(self._busp, self._devicep)
+                    vcli.vigem_target_free(self._devicep)
+                    print(f"Manette virtuelle non connectée, nouvel essai ({attempt}/{GAMEPAD_ATTEMPTS - 1})")
+                    time.sleep(GAMEPAD_RETRY_DELAY)
+
+    vgamepad.VX360Gamepad = RetryingX360Gamepad
 
 
 class LidarInterface(TM2020InterfaceLidar):
@@ -54,6 +91,7 @@ class LidarInterface(TM2020InterfaceLidar):
 
     def initialize(self):
         """Connects to the game, then replaces TMRL's reward function with one that reads our trajectory."""
+        use_retrying_gamepad()
         super().initialize()
         self.reward_function = TrajectoryReward(load_trajectory(self.reward_path))
 
