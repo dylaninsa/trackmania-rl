@@ -16,8 +16,13 @@ Examples:
 
         uv run python scripts/evaluate.py --policy ppo --config configs/ppo_trackmania.json --checkpoint checkpoints/ppo_trackmania_seed0.pt --episodes 5
 
+    Evaluate a trained SAC agent::
+
+        uv run python scripts/evaluate.py --policy sac --config configs/sac_trackmania.json --checkpoint checkpoints/sac_trackmania_seed0.pt --episodes 5
+
 Attributes:
     TIME_STEP (float): Duration of a step in seconds, used to compute the finish time.
+    AGENTS (dict): Agent class of each trained policy, by name on the command line.
 """
 
 import argparse
@@ -26,17 +31,19 @@ import json
 from pathlib import Path
 
 from algos.ppo import PPOAgent
+from algos.sac import SACAgent
 from baselines.policies import PIDPolicy, RandomPolicy
 from envs.trackmania import make_env
 
 TIME_STEP = 0.05
+AGENTS = {"ppo": PPOAgent, "sac": SACAgent}
 
 
-class PPOPolicy:
-    """Deterministic policy of a trained PPO agent, with the interface of the baselines.
+class TrainedPolicy:
+    """Deterministic policy of a trained agent, with the interface of the baselines.
 
     Args:
-        agent (PPOAgent): Trained agent.
+        agent (PPOAgent | SACAgent): Trained agent.
     """
 
     def __init__(self, agent):
@@ -62,20 +69,20 @@ def make_policy(args, env):
     """Creates the policy to evaluate.
 
     Args:
-        args (argparse.Namespace): Command line arguments: ``policy``, ``seed``, and for PPO ``config`` and
-            ``checkpoint``.
-        env (gymnasium.Env): Environment, whose spaces give the dimensions of the PPO networks.
+        args (argparse.Namespace): Command line arguments: ``policy``, ``seed``, and for a trained agent
+            ``config`` and ``checkpoint``.
+        env (gymnasium.Env): Environment, whose spaces give the dimensions of the networks.
 
     Returns:
-        RandomPolicy | PIDPolicy | PPOPolicy: The policy.
+        RandomPolicy | PIDPolicy | TrainedPolicy: The policy.
     """
     if args.policy == "random":
         return RandomPolicy(args.seed)
-    if args.policy == "ppo":
+    if args.policy in AGENTS:
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))
-        agent = PPOAgent(env.observation_space.shape[0], env.action_space.shape[0], config)
+        agent = AGENTS[args.policy](env.observation_space.shape[0], env.action_space.shape[0], config)
         agent.load(args.checkpoint)
-        return PPOPolicy(agent)
+        return TrainedPolicy(agent)
     return PIDPolicy()
 
 
@@ -84,7 +91,7 @@ def run_episode(env, policy):
 
     Args:
         env (gymnasium.Env): Environment created by ``make_env``.
-        policy (RandomPolicy | PIDPolicy | PPOPolicy): Policy exposing ``reset()`` and ``act(obs)``.
+        policy (RandomPolicy | PIDPolicy | TrainedPolicy): Policy exposing ``reset()`` and ``act(obs)``.
 
     Returns:
         dict: ``return`` (sum of the rewards), ``steps``, ``distance_m`` and ``progress`` at the last step,
@@ -114,25 +121,25 @@ def run_episode(env, policy):
 def main():
     """Evaluates the policy given on the command line and writes one CSV row per episode.
 
-    The default output file is ``results/<policy>.csv``, or ``results/random_seed<seed>.csv`` for the random
-    agent with a seed, so that the results of different seeds are not overwritten.
-    ``results/eval_<checkpoint>.csv`` for a PPO agent.
+    The default output file is ``results/<policy>.csv``, ``results/random_seed<seed>.csv`` for the random
+    agent with a seed, so that the results of different seeds are not overwritten, and
+    ``results/eval_<checkpoint>.csv`` for a trained agent.
     """
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--policy", choices=["random", "pid", "ppo"], required=True)
+    parser.add_argument("--policy", choices=["random", "pid", *AGENTS], required=True)
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--seed", type=int, default=None, help="graine de l'agent aléatoire (ignorée par le PID)")
     parser.add_argument("--ep-max-length", type=int, default=3000)
-    parser.add_argument("--config", default=None, help="configuration d'entraînement de l'agent PPO")
-    parser.add_argument("--checkpoint", default=None, help="fichier .pt de l'agent PPO")
+    parser.add_argument("--config", default=None, help="configuration d'entraînement de l'agent")
+    parser.add_argument("--checkpoint", default=None, help="fichier .pt de l'agent")
     parser.add_argument("--output", default=None, help="fichier CSV de sortie")
     args = parser.parse_args()
-    if args.policy == "ppo" and (args.config is None or args.checkpoint is None):
-        parser.error("--policy ppo demande --config et --checkpoint")
+    if args.policy in AGENTS and (args.config is None or args.checkpoint is None):
+        parser.error(f"--policy {args.policy} demande --config et --checkpoint")
 
     if args.output is not None:
         output_file = Path(args.output)
-    elif args.policy == "ppo":
+    elif args.policy in AGENTS:
         output_file = Path("results") / f"eval_{Path(args.checkpoint).stem}.csv"
     elif args.policy == "random" and args.seed is not None:
         output_file = Path("results") / f"random_seed{args.seed}.csv"
