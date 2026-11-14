@@ -48,31 +48,43 @@ def evaluate(agent, env, episodes, seed):
         seed (int): Seed of the first episode; episode ``k`` uses ``seed + k``.
 
     Returns:
-        tuple[float, float]: Mean and standard deviation of the returns.
+        dict: ``mean_return`` and ``std_return``. In TrackMania, whose ``info`` holds ``distance_m`` and
+            ``end_of_track``, also ``mean_distance_m`` and ``finish_rate``, read at the last step of each
+            episode.
     """
     returns = []
+    distances = []
+    finished = []
     for episode in range(episodes):
-        obs, _ = env.reset(seed=seed + episode)
+        obs, info = env.reset(seed=seed + episode)
         agent.reset()
         episode_return = 0.0
         terminated = truncated = False
         while not (terminated or truncated):
             action = agent.act(obs, deterministic=True)
-            obs, reward, terminated, truncated, _ = env.step(action * env.action_space.high)
+            obs, reward, terminated, truncated, info = env.step(action * env.action_space.high)
             episode_return += float(reward)
         returns.append(episode_return)
-    return float(np.mean(returns)), float(np.std(returns))
+        if "distance_m" in info:
+            distances.append(info["distance_m"])
+            finished.append(float(info["end_of_track"]))
+    result = {"mean_return": float(np.mean(returns)), "std_return": float(np.std(returns))}
+    if distances:
+        result["mean_distance_m"] = float(np.mean(distances))
+        result["finish_rate"] = float(np.mean(finished))
+    return result
 
 
 def save_evaluations(evaluations, path):
     """Writes the evaluations to a CSV file, replacing its previous content.
 
     Args:
-        evaluations (list[dict]): ``step``, ``mean_return`` and ``std_return`` of each evaluation.
+        evaluations (list[dict]): ``step`` and the results of ``evaluate`` for each evaluation. The columns
+            are the keys of the first one.
         path (pathlib.Path): Destination file.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as f:
-        csv_writer = csv.DictWriter(f, fieldnames=["step", "mean_return", "std_return"])
+        csv_writer = csv.DictWriter(f, fieldnames=list(evaluations[0]))
         csv_writer.writeheader()
         csv_writer.writerows(evaluations)

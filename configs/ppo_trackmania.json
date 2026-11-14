@@ -1,7 +1,7 @@
 {
     "env": "trackmania",
     "seed": 0,
-    "total_steps": 300000,
+    "total_steps": 200000,
     "buffer_size": 4096,
     "ep_max_length": 3000,
     "batch_size": 256,

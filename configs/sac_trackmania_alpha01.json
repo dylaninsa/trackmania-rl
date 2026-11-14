@@ -1,0 +1,18 @@
+{
+  "env": "trackmania",
+  "seed": 0,
+  "total_steps": 200000,
+  "start_steps": 5000,
+  "buffer_size": 300000,
+  "ep_max_length": 3000,
+  "updates_per_step": 1.0,
+  "batch_size": 256,
+  "eval_every": 20000,
+  "eval_episodes": 3,
+  "hidden": 256,
+  "lr": 0.0003,
+  "gamma": 0.99,
+  "tau": 0.005,
+  "device": "cpu",
+  "init_alpha": 0.1
+}

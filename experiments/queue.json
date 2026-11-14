@@ -1,0 +1,68 @@
+[
+  {
+    "algo": "ppo",
+    "config": "configs/ppo_trackmania.json",
+    "seed": 0
+  },
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania.json",
+    "seed": 0
+  },
+  {
+    "algo": "ppo",
+    "config": "configs/ppo_trackmania.json",
+    "seed": 1
+  },
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania.json",
+    "seed": 1
+  },
+  {
+    "algo": "ppo",
+    "config": "configs/ppo_trackmania.json",
+    "seed": 2
+  },
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania.json",
+    "seed": 2
+  },
+  {
+    "algo": "ppo",
+    "config": "configs/ppo_trackmania_ent01.json",
+    "seed": 0,
+    "max_steps": 60000
+  },
+  {
+    "algo": "ppo",
+    "config": "configs/ppo_trackmania_lr1e3.json",
+    "seed": 0,
+    "max_steps": 60000
+  },
+  {
+    "algo": "ppo",
+    "config": "configs/ppo_trackmania_buf2048.json",
+    "seed": 0,
+    "max_steps": 60000
+  },
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania_alpha01.json",
+    "seed": 0,
+    "max_steps": 60000
+  },
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania_upd05.json",
+    "seed": 0,
+    "max_steps": 60000
+  },
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania_lr1e3.json",
+    "seed": 0,
+    "max_steps": 60000
+  }
+]

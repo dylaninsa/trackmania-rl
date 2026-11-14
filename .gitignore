@@ -19,3 +19,6 @@ results/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Logs de la file d'attente
+logs/

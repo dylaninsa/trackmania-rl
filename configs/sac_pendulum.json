@@ -13,5 +13,6 @@
   "tau": 0.005,
   "device": "cpu",
   "ep_max_length": 200,
-  "updates_per_step": 1.0
+  "updates_per_step": 1.0,
+  "init_alpha": 1.0
 }

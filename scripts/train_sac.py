@@ -37,6 +37,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", required=True, help="fichier JSON des hyperparamètres")
     parser.add_argument("--seed", type=int, default=None, help="remplace la graine de la configuration")
+    parser.add_argument("--max-steps", type=int, default=None,
+                        help="arrête plus tôt, sans changer total_steps ni la décroissance du taux d'apprentissage")
     args = parser.parse_args()
 
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
@@ -62,7 +64,8 @@ def main():
     episode = 0
     step = 0
     next_eval = config["eval_every"]
-    while step < config["total_steps"]:
+    max_steps = config["total_steps"] if args.max_steps is None else args.max_steps
+    while step < max_steps:
         if step < config["start_steps"]:
             action = rng.uniform(-1.0, 1.0, size=act_dim).astype(np.float32)
         else:
@@ -87,12 +90,14 @@ def main():
                 writer.add_scalar(f"train/{key}", float(np.mean([m[key] for m in metrics])), step)
 
         if step >= next_eval:
-            mean, std = evaluate(agent, eval_env, config["eval_episodes"], seed + 1000)
-            evaluations.append({"step": step, "mean_return": mean, "std_return": std})
-            writer.add_scalar("eval/mean_return", mean, step)
+            result = evaluate(agent, eval_env, config["eval_episodes"], seed + 1000)
+            evaluations.append({"step": step, **result})
+            for key, value in result.items():
+                writer.add_scalar(f"eval/{key}", value, step)
             save_evaluations(evaluations, results_file)
             agent.save(checkpoint_file)
-            print(f"Pas {step:7d}, épisode {episode:5d} : retour en évaluation {mean:8.1f} ± {std:6.1f}")
+            summary = ", ".join(f"{key} {value:.2f}" for key, value in result.items())
+            print(f"Pas {step:7d}, épisode {episode:5d} : {summary}", flush=True)
             next_eval += config["eval_every"]
 
         obs, _ = env.reset()

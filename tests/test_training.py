@@ -4,6 +4,7 @@ import runpy
 import sys
 from pathlib import Path
 
+import gymnasium as gym
 import numpy as np
 import pytest
 
@@ -76,7 +77,7 @@ class ConstantAgent:
         return self.action
 
 
-def run_script(script, config, tmp_path, monkeypatch):
+def run_script(script, config, tmp_path, monkeypatch, extra_args=()):
     """Runs a training script on a small configuration, from a temporary working directory.
 
     Args:
@@ -84,6 +85,7 @@ def run_script(script, config, tmp_path, monkeypatch):
         config (dict): Configuration written to ``tmp_path``.
         tmp_path (pathlib.Path): Working directory of the run.
         monkeypatch (pytest.MonkeyPatch): Fixture used to change the directory and the command line.
+        extra_args (tuple[str, ...]): Additional command line arguments.
 
     Returns:
         list[dict]: Rows of the evaluations CSV file.
@@ -91,7 +93,7 @@ def run_script(script, config, tmp_path, monkeypatch):
     config_file = tmp_path / "tiny.json"
     config_file.write_text(json.dumps(config), encoding="utf-8")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", [script, "--config", str(config_file), "--seed", "3"])
+    monkeypatch.setattr(sys, "argv", [script, "--config", str(config_file), "--seed", "3", *extra_args])
     runpy.run_path(str(SCRIPTS / script), run_name="__main__")
     assert (tmp_path / "checkpoints" / "tiny_seed3.pt").exists()
     with open(tmp_path / "results" / "tiny_seed3.csv", encoding="utf-8") as f:
@@ -111,12 +113,13 @@ def test_evaluate_plays_deterministic_episodes():
     env, _ = make_envs({"env": "Pendulum-v1", "ep_max_length": 200})
     agent = ConstantAgent(np.zeros(1, dtype=np.float32))
 
-    mean, std = evaluate(agent, env, episodes=3, seed=7)
+    result = evaluate(agent, env, episodes=3, seed=7)
 
     assert agent.resets == 3
     assert len(agent.deterministic_calls) == 3 * 200
     assert all(agent.deterministic_calls)
-    assert mean < 0.0 and std >= 0.0
+    assert sorted(result) == ["mean_return", "std_return"]
+    assert result["mean_return"] < 0.0 and result["std_return"] >= 0.0
 
 
 def test_evaluate_is_reproducible_with_the_same_seed():
@@ -159,3 +162,65 @@ def test_train_sac_runs_end_to_end(tmp_path, monkeypatch):
 
     assert [int(row["step"]) for row in rows] == [200, 400]
     assert all(np.isfinite(float(row["mean_return"])) for row in rows)
+
+
+class FakeTrackEnv:
+    """Environment whose episodes last one step and whose ``info`` looks like TrackMania's.
+
+    Args:
+        outcomes (list[tuple[float, bool]]): ``(distance_m, end_of_track)`` at the end of each episode.
+    """
+
+    def __init__(self, outcomes):
+        self.outcomes = iter(outcomes)
+        self.action_space = gym.spaces.Box(-1.0, 1.0, shape=(3,))
+
+    def reset(self, seed=None):
+        """Starts an episode.
+
+        Args:
+            seed (int | None): Ignored, like in the game.
+
+        Returns:
+            tuple[np.ndarray, dict]: Observation and ``info``.
+        """
+        return np.zeros(83, dtype=np.float32), {"distance_m": 0.0, "end_of_track": False}
+
+    def step(self, action):
+        """Ends the episode with the next outcome.
+
+        Args:
+            action (np.ndarray): Ignored.
+
+        Returns:
+            tuple: Observation, reward, terminated, truncated and ``info``.
+        """
+        distance, finished = next(self.outcomes)
+        info = {"distance_m": distance, "end_of_track": finished}
+        return np.zeros(83, dtype=np.float32), distance / 10, True, False, info
+
+
+def test_evaluate_reports_distance_and_finish_rate_in_trackmania():
+    env = FakeTrackEnv([(100.0, False), (2059.0, True)])
+
+    result = evaluate(ConstantAgent(np.zeros(3, dtype=np.float32)), env, episodes=2, seed=0)
+
+    assert result["mean_distance_m"] == pytest.approx(1079.5)
+    assert result["finish_rate"] == pytest.approx(0.5)
+    assert result["mean_return"] == pytest.approx(107.95)
+
+
+def test_save_evaluations_uses_the_keys_as_columns(tmp_path):
+    path = tmp_path / "run.csv"
+
+    save_evaluations([{"step": 1, "mean_return": 2.0, "mean_distance_m": 30.0, "finish_rate": 0.0}], path)
+
+    with open(path, encoding="utf-8") as f:
+        assert next(csv.reader(f)) == ["step", "mean_return", "mean_distance_m", "finish_rate"]
+
+
+@pytest.mark.parametrize("script, config", [("train_ppo.py", PPO_CONFIG), ("train_sac.py", SAC_CONFIG)])
+def test_max_steps_stops_before_total_steps(script, config, tmp_path, monkeypatch):
+    rows = run_script(script, config, tmp_path, monkeypatch, extra_args=("--max-steps", "200"))
+
+    assert [int(row["step"]) for row in rows] == [200]
