@@ -230,6 +230,88 @@ tirer une conclusion sur les performances. La troncation à `ep_max_length` est 
 `check_env.py --ep-max-length 100`, car des épisodes de 300 pas sont presque toujours terminés avant par un
 échec.
 
+## Validation de SAC sur Pendulum-v1
+
+Avant de brancher SAC sur TrackMania, on vérifie qu'il apprend sur un environnement léger où le résultat est
+connu. Si SAC échoue ici, le bug est dans l'algorithme et non dans le jeu. Cette étape ne demande pas
+TrackMania et tourne sur Mac, Windows et Linux.
+
+```bash
+uv run python scripts/validate_sac_pendulum.py --seeds 0 1 2   # entraînement + critères (de 6 à 15 min par graine sur CPU selon la machine)
+uv run python scripts/plot_sac_pendulum.py                     # courbes dans results/sac_pendulum.png
+uv run pytest tests/test_validate_sac_pendulum.py              # tests du script (quelques secondes)
+```
+
+Les hyperparamètres sont dans `configs/sac_pendulum.json` (20 000 pas, 1 000 pas aléatoires de warm-up, réseaux de
+256 unités, lr 3e-4, γ = 0,99, τ = 0,005, lots de 256, entropie cible = -1, α appris). Options du script :
+`--config`, `--seeds`, `--total-steps`, `--output-dir`.
+
+### Protocole
+
+- **Pendulum-v1** : observation de dimension 3, action de dimension 1 dans [-2, 2], épisodes de 200 pas. Il ne
+  se termine jamais (`terminated` toujours faux), il est seulement tronqué à 200 pas : c'est un bon test du
+  choix de ne stocker que `terminated` dans le replay buffer.
+- L'agent sort des actions dans [-1, 1] ; le script les multiplie par 2 avant de les envoyer à l'environnement.
+- Après le warm-up, **une mise à jour par pas** d'environnement (ratio 1:1).
+- Toutes les 2 000 pas, la politique **déterministe** est évaluée sur 10 épisodes. L'environnement d'évaluation
+  est distinct de celui d'entraînement et ses graines sont séparées de la graine d'entraînement. Elles
+  dépendent toutefois de la graine du run : chaque graine est évaluée sur 10 états de départ différents, donc un
+  écart de quelques dizaines de points entre deux graines n'est pas significatif (l'écart type entre épisodes est
+  de 65 à 110). Une évaluation a aussi lieu au pas 0 (agent non entraîné), qui doit être proche d'une politique
+  aléatoire.
+- Le script écrit `results/sac_pendulum_seed{graine}.csv` (non versionné) avec, pour chaque évaluation : le
+  retour moyen et son écart type, le retour moyen des épisodes d'entraînement, et la moyenne depuis la dernière
+  évaluation de `critic_loss`, `actor_loss`, `alpha`, `q_mean` et `entropy`.
+
+### Critères de réussite
+
+Le script sort avec le code 1 si un critère échoue, pour au moins une graine :
+
+| Critère | Seuil |
+|---------|-------|
+| Métriques de `update` | toujours finies |
+| Apprentissage | retour d'évaluation **> -250** au plus tard à 10 000 pas |
+| Stabilité | moyenne des deux dernières évaluations **> -250** (pas d'effondrement) |
+
+Repères : une politique aléatoire fait environ **-1 200** par épisode ; un SAC correct se stabilise entre -100 et
+-200. On lance **3 graines** : une seule graine qui réussit ne prouve rien.
+
+### Lecture des courbes
+
+- **Retour d'évaluation** : doit monter de -1 200 vers -150 environ, puis rester stable.
+- **α** : part de 1 (`log_alpha` initialisé à 0) et diminue progressivement.
+- **Entropie** : baisse vers la cible (-1 en dimension 1) quand α se stabilise.
+- **Q moyen** : doit rester borné. Une explosion signale un problème de cible de Bellman.
+
+### Si SAC n'apprend pas
+
+Vérifier dans cet ordre :
+
+1. Échelle de l'action (×2 oublié ou appliqué deux fois).
+2. Correction tanh du log-probabilité dans `networks/sac.py`.
+3. Formes des tenseurs : `rew`, `terminated` et Q doivent être de forme `(B,)`, sinon un `(B, B)` silencieux fausse la perte.
+4. Cible de Bellman : réseaux cibles, action échantillonnée sur `next_obs`, masque `(1 - terminated)`, sous `torch.no_grad()`.
+5. Mise à jour de Polyak (τ = 0,005) et non une copie complète.
+6. Gradients : l'acteur ne doit pas modifier les critiques ; α est optimisé via `log_alpha`.
+7. Évaluation : `deterministic=True` doit utiliser `tanh(moyenne)`.
+
+### Résultats
+
+Run de 20 000 pas, évaluation tous les 2 000 pas (le « premier pas » a donc cette résolution) :
+
+| Graine | Premier pas avec retour > -250 | Retour final (moy. des 2 dernières éval.) | α final | Temps |
+|--------|-------------------------------|-------------------------------------------|---------|-------|
+| 0 | 4 000 (-154,7) | -109,4 | 0,036 | 388 s |
+| 1 | 4 000 (-248,4) | -191,2 | 0,039 | 929 s |
+| 2 | 4 000 (-198,6) | -145,3 | 0,029 | 901 s |
+
+Les trois graines respectent les critères : SAC apprend sur Pendulum-v1. Les temps varient du simple au double
+d'une graine à l'autre parce que la machine n'était pas dédiée au calcul : ils ne servent pas à mesurer le coût
+d'entraînement (voir la mesure de `sac_smoke_test.py`, environ 12,6 ms par mise à jour). La graine 1 passe le
+seuil de justesse à 4 000 pas, mais elle est à -193,8 dès 6 000 pas.
+
+Limite : cette validation montre que SAC apprend sur Pendulum-v1, pas qu'il apprendra sur TrackMania (observations
+de dimension 83, récompense creuse, contrainte temps réel).
 
 ## Méthode de travail
 
