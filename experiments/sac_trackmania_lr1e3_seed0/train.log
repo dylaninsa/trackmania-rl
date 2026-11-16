@@ -1,0 +1,5 @@
+Manette virtuelle non connectée, nouvel essai (1/4)
+Manette virtuelle non connectée, nouvel essai (2/4)
+Pas   20125, épisode   111 : mean_return 0.82, std_return 0.18, mean_distance_m 8.20, finish_rate 0.00
+Pas   41607, épisode   258 : mean_return 1.41, std_return 0.01, mean_distance_m 14.10, finish_rate 0.00
+Évaluations dans results\sac_trackmania_lr1e3_seed0.csv, agent dans checkpoints\sac_trackmania_lr1e3_seed0.pt

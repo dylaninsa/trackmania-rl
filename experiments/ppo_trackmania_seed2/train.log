@@ -1,0 +1,13 @@
+Manette virtuelle non connectée, nouvel essai (1/4)
+Manette virtuelle non connectée, nouvel essai (2/4)
+Manette virtuelle non connectée, nouvel essai (3/4)
+Pas   20035, épisode   156 : mean_return 0.00, std_return 0.00, mean_distance_m 0.00, finish_rate 0.00
+Pas   40117, épisode   216 : mean_return 0.00, std_return 0.00, mean_distance_m 0.00, finish_rate 0.00
+Pas   60253, épisode   294 : mean_return 9.62, std_return 0.00, mean_distance_m 96.20, finish_rate 0.00
+Pas   81083, épisode   367 : mean_return 9.64, std_return 0.02, mean_distance_m 96.43, finish_rate 0.00
+Pas  100820, épisode   411 : mean_return 9.77, std_return 0.00, mean_distance_m 97.70, finish_rate 0.00
+Pas  120113, épisode   439 : mean_return 34.23, std_return 34.82, mean_distance_m 342.33, finish_rate 0.00
+Pas  141135, épisode   471 : mean_return 128.67, std_return 34.11, mean_distance_m 1286.67, finish_rate 0.00
+Pas  160596, épisode   498 : mean_return 128.46, std_return 34.31, mean_distance_m 1284.60, finish_rate 0.00
+Pas  181087, épisode   523 : mean_return 51.86, std_return 59.91, mean_distance_m 518.60, finish_rate 0.00
+Évaluations dans results\ppo_trackmania_seed2.csv, agent dans checkpoints\ppo_trackmania_seed2.pt

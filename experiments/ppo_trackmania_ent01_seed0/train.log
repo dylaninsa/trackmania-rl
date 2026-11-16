@@ -1,0 +1,6 @@
+Manette virtuelle non connectée, nouvel essai (1/4)
+Manette virtuelle non connectée, nouvel essai (2/4)
+Manette virtuelle non connectée, nouvel essai (3/4)
+Pas   20307, épisode   121 : mean_return 0.00, std_return 0.00, mean_distance_m 0.00, finish_rate 0.00
+Pas   40002, épisode   177 : mean_return 0.00, std_return 0.00, mean_distance_m 0.00, finish_rate 0.00
+Évaluations dans results\ppo_trackmania_ent01_seed0.csv, agent dans checkpoints\ppo_trackmania_ent01_seed0.pt

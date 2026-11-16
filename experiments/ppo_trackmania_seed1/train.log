@@ -1,0 +1,15 @@
+Manette virtuelle non connectée, nouvel essai (1/4)
+Manette virtuelle non connectée, nouvel essai (2/4)
+Manette virtuelle non connectée, nouvel essai (3/4)
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05868459999328479
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas   20315, épisode   120 : mean_return 0.00, std_return 0.00, mean_distance_m 0.00, finish_rate 0.00
+Pas   40029, épisode   183 : mean_return 0.00, std_return 0.00, mean_distance_m 0.00, finish_rate 0.00
+Pas   60176, épisode   269 : mean_return 9.98, std_return 0.03, mean_distance_m 99.83, finish_rate 0.00
+Pas   80790, épisode   321 : mean_return 9.87, std_return 0.00, mean_distance_m 98.70, finish_rate 0.00
+Pas  100531, épisode   347 : mean_return 83.56, std_return 0.07, mean_distance_m 835.57, finish_rate 0.00
+Pas  120745, épisode   370 : mean_return 128.50, std_return 34.32, mean_distance_m 1285.03, finish_rate 0.00
+Pas  140382, épisode   388 : mean_return 118.78, std_return 25.44, mean_distance_m 1187.77, finish_rate 0.00
+Pas  160974, épisode   408 : mean_return 128.41, std_return 34.32, mean_distance_m 1284.07, finish_rate 0.00
+Pas  181450, épisode   427 : mean_return 128.31, std_return 34.49, mean_distance_m 1283.07, finish_rate 0.00
+Évaluations dans results\ppo_trackmania_seed1.csv, agent dans checkpoints\ppo_trackmania_seed1.pt
