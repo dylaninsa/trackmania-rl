@@ -20,87 +20,13 @@ Examples:
 """
 
 import argparse
-import csv
 import json
-import random
 from pathlib import Path
 
-import gymnasium as gym
-import numpy as np
-import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from algos.ppo import PPOAgent
-
-
-def set_seed(seed):
-    """Seeds the random generators of Python, NumPy and PyTorch.
-
-    Args:
-        seed (int): Seed.
-    """
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-
-def make_envs(config):
-    """Creates the training and evaluation environments.
-
-    ``envs.trackmania`` is imported only for TrackMania, so that the other environments do not need TMRL.
-
-    Args:
-        config (dict): Configuration, with ``env`` and ``ep_max_length``.
-
-    Returns:
-        tuple[gymnasium.Env, gymnasium.Env]: Training and evaluation environments. They are the same object
-            for TrackMania, since only one game can be driven.
-    """
-    if config["env"] == "trackmania":
-        from envs.trackmania import make_env
-        env = make_env(ep_max_length=config["ep_max_length"])
-        return env, env
-    return gym.make(config["env"]), gym.make(config["env"])
-
-
-def evaluate(agent, env, episodes, seed):
-    """Plays several episodes with the deterministic policy of the agent.
-
-    Args:
-        agent (PPOAgent): Agent to evaluate.
-        env (gymnasium.Env): Evaluation environment.
-        episodes (int): Number of episodes.
-        seed (int): Seed of the first episode; episode ``k`` uses ``seed + k``.
-
-    Returns:
-        tuple[float, float]: Mean and standard deviation of the returns.
-    """
-    returns = []
-    for episode in range(episodes):
-        obs, _ = env.reset(seed=seed + episode)
-        agent.reset()
-        episode_return = 0.0
-        terminated = truncated = False
-        while not (terminated or truncated):
-            action = agent.act(obs, deterministic=True)
-            obs, reward, terminated, truncated, _ = env.step(action * env.action_space.high)
-            episode_return += float(reward)
-        returns.append(episode_return)
-    return float(np.mean(returns)), float(np.std(returns))
-
-
-def save_evaluations(evaluations, path):
-    """Writes the evaluations to a CSV file, replacing its previous content.
-
-    Args:
-        evaluations (list[dict]): ``step``, ``mean_return`` and ``std_return`` of each evaluation.
-        path (pathlib.Path): Destination file.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        csv_writer = csv.DictWriter(f, fieldnames=["step", "mean_return", "std_return"])
-        csv_writer.writeheader()
-        csv_writer.writerows(evaluations)
+from training.common import evaluate, make_envs, save_evaluations, set_seed
 
 
 def main():
@@ -108,6 +34,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", required=True, help="fichier JSON des hyperparamètres")
     parser.add_argument("--seed", type=int, default=None, help="remplace la graine de la configuration")
+    parser.add_argument("--max-steps", type=int, default=None,
+                        help="arrête plus tôt, sans changer total_steps ni la décroissance du taux d'apprentissage")
     args = parser.parse_args()
 
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
@@ -132,7 +60,8 @@ def main():
     episode = 0
     step = 0
     next_eval = config["eval_every"]
-    while step < config["total_steps"]:
+    max_steps = config["total_steps"] if args.max_steps is None else args.max_steps
+    while step < max_steps:
         action, raw_action, log_prob, value = agent.select_action(obs, update_stats=True)
         next_obs, reward, terminated, truncated, _ = env.step(action * env.action_space.high)
         agent.store(obs, raw_action, log_prob, reward, value, next_obs, terminated, truncated)
@@ -152,12 +81,14 @@ def main():
                 writer.add_scalar(f"train/{key}", metric, step)
 
         if step >= next_eval:
-            mean, std = evaluate(agent, eval_env, config["eval_episodes"], seed + 1000)
-            evaluations.append({"step": step, "mean_return": mean, "std_return": std})
-            writer.add_scalar("eval/mean_return", mean, step)
+            result = evaluate(agent, eval_env, config["eval_episodes"], seed + 1000)
+            evaluations.append({"step": step, **result})
+            for key, value in result.items():
+                writer.add_scalar(f"eval/{key}", value, step)
             save_evaluations(evaluations, results_file)
             agent.save(checkpoint_file)
-            print(f"Pas {step:7d}, épisode {episode:5d} : retour en évaluation {mean:8.1f} ± {std:6.1f}")
+            summary = ", ".join(f"{key} {value:.2f}" for key, value in result.items())
+            print(f"Pas {step:7d}, épisode {episode:5d} : {summary}", flush=True)
             next_eval += config["eval_every"]
 
         obs, _ = env.reset()

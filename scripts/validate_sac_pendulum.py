@@ -217,7 +217,7 @@ def main():
     for seed in seeds:
         print(f"\n[graine {seed}]")
         rows, non_finite = train(config, seed)
-        path = Path(args.output_dir) / f"sac_pendulum_seed{seed}.csv"
+        path = Path(args.output_dir) / f"sac_pendulum_reference_seed{seed}.csv"
         write_csv(rows, path)
         print(f"  résultats enregistrés dans {path}")
         problems = check_run(rows, non_finite)

@@ -5,6 +5,7 @@ replay buffer: the training loop samples batches and passes them to ``update``.
 """
 
 import copy
+import math
 from pathlib import Path
 
 import torch
@@ -21,8 +22,8 @@ class SACAgent:
     Args:
         obs_dim (int): Size of an observation.
         act_dim (int): Size of an action.
-        config (dict): Hyperparameters ``hidden``, ``lr``, ``gamma``, ``tau`` and ``device``. The target
-            entropy is ``-act_dim``.
+        config (dict): Hyperparameters ``hidden``, ``lr``, ``gamma``, ``tau``, ``device``, and optionally
+            ``init_alpha``, the initial temperature (1.0 by default). The target entropy is ``-act_dim``.
     """
 
     def __init__(self, obs_dim, act_dim, config):
@@ -37,7 +38,9 @@ class SACAgent:
         self.q1_target = copy.deepcopy(self.q1).requires_grad_(False)
         self.q2_target = copy.deepcopy(self.q2).requires_grad_(False)
 
-        self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
+        self.log_alpha = torch.full(
+            (1,), math.log(config.get("init_alpha", 1.0)), requires_grad=True, device=self.device
+        )
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=config["lr"])
         self.critic_optimizer = torch.optim.Adam(list(self.q1.parameters()) + list(self.q2.parameters()),
                                                  lr=config["lr"])

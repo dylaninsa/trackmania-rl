@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import torch
 
 from algos.sac import SACAgent
@@ -152,3 +153,12 @@ def test_save_load_round_trip(tmp_path):
     expected = agent.update(batch)
     torch.manual_seed(2)
     assert restored.update(batch) == expected
+
+
+def test_initial_temperature_defaults_to_one_and_can_be_set():
+    default = make_agent()
+    low = SACAgent(OBS_DIM, ACT_DIM, {**CONFIG, "init_alpha": 0.1})
+
+    assert default.log_alpha.exp().item() == pytest.approx(1.0)
+    assert low.log_alpha.exp().item() == pytest.approx(0.1)
+    assert low.log_alpha.requires_grad

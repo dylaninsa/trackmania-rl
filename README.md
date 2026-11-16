@@ -24,14 +24,14 @@ Le projet est géré avec [uv](https://docs.astral.sh/uv/). L'environnement virt
 est créé dans `.venv/` à la racine du dépôt ; il n'est pas versionné, mais
 `uv.lock` garantit que tout le monde a les mêmes versions.
 
-pour installer uv :
+Pour installer uv sous Windows :
+
 ```bash
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-(Après l'installation, fermez et rouvrez votre terminal pour que la commande uv soit reconnue).
+Fermez et rouvrez ensuite le terminal pour que la commande `uv` soit reconnue, puis, à la racine du projet :
 
-Une fois le terminal rouvert, et après s'être placé à la racine du projet : 
 ```bash
 uv sync
 ```
@@ -158,160 +158,6 @@ uv run python scripts/evaluate.py --policy random --episodes 10 --seed 0
 Limite connue du PID : il réagit à ce qu'il voit sans anticiper, et frôle le mur
 à environ 10 m/s dans le virage serré situé vers 1 659 m.
 
-**Replay buffer**
-`algos/replay_buffer.py` stocke les transitions pour SAC. La boucle d'entraînement y ajoute chaque pas et tire des lots qu'elle passe à `SACAgent.update`.
-
-```python
-from algos.replay_buffer import ReplayBuffer
-buffer = ReplayBuffer(obs_dim=83, act_dim=3, capacity=100_000, device="cpu", seed=0)
-buffer.add(obs, act, rew, next_obs, terminated)
-batch = buffer.sample(256)  # dict de tenseurs float32 : obs, act, rew, next_obs, terminated
-```
-
-Choix de conception :
-- **Tampon circulaire** de tableaux numpy préalloués : une fois plein, les nouvelles transitions écrasent les plus anciennes. Une transition occupe environ 0,7 Ko (171 flottants), soit 68 Mo pour 100 000 transitions et 0,7 Go pour 1 million.
-- **Seul `terminated` est stocké, pas `truncated`**. Un épisode tronqué à `ep_max_length` aurait pu continuer : sa dernière transition doit rester bootstrapée dans la cible de Bellman. Les épisodes terminés par un échec ou par l'arrivée coupent le futur.
-- **`rew` et `terminated` ont la forme `(B,)`, pas `(B, 1)`**. Les critiques renvoient des Q de forme `(B,)` : avec une cible `(B, 1)`, le broadcasting produirait une matrice `(B, B)` sans aucune erreur, et la perte serait fausse.
-- **`seed` optionnel** : `torch.manual_seed` ne contrôle pas le tirage des lots (numpy). Sans cette graine, deux entraînements avec la même graine divergeraient, ce qui contredit le protocole « plusieurs graines ».
-- `sample` lève une `ValueError` si le tampon est vide.
-
-Tests (sans le jeu) : 
-```bash
-uv run pytest tests/test_replay_buffer.py.
-```
-
-## Test d'intégration SAC et TrackMania
- 
-`scripts/sac_smoke_test.py` vérifie sur le vrai jeu que la chaîne environnement → replay buffer → agent SAC
-fonctionne, avant de lancer de longs entraînements. **Ce n'est pas un script d'entraînement** : l'agent est
-beaucoup trop peu entraîné pour apprendre quoi que ce soit.
- 
-```bash
-uv run python scripts/sac_smoke_test.py
-uv run python scripts/sac_smoke_test.py --device cuda --episodes 5   # options : --help
-```
- 
-Même préparation que `check_env.py` (jeu ouvert sur `tmrl-test`, fenêtré, vue cockpit, clic dans la
-fenêtre). Le script se déroule en quatre phases :
- 
-1. **Warm-up** : actions aléatoires pour remplir le tampon.
-2. **Épisodes SAC** (politique stochastique, 300 pas maximum) avec des mises à jour de gradient **entre**
-   les épisodes uniquement, puisque le jeu ne se met pas en pause pendant un épisode.
-3. **Évaluation** : un épisode avec la politique déterministe.
-4. **Checkpoint** : `save` puis `load` dans un nouvel agent doivent donner la même action.
-Il vérifie le contrat de l'environnement (observation de 83 `float32`, 4 balayages identiques et actions
-nulles au `reset`, clés de `info`, récompense jamais négative), la validité des actions, la finitude des
-métriques de `update`, et mesure la durée de `act()`, d'un pas et d'une mise à jour. Les violations sont
-listées en fin d'exécution et le code de sortie vaut 1 s'il y en a.
- 
-**Résultats** (machine d'Antoine, CPU ; réseaux de 256 unités, lots de 256 ; réglages provisoires fixés
-dans le script, à remplacer par `configs/`) :
- 
-| Mesure | Valeur | Lecture |
-|--------|--------|---------|
-| Durée d'un pas avec SAC | 50,0 à 50,3 ms en moyenne, pics de 55 à 67 ms | Identique à `check_env.py` (50,0 ms) : `act()` ne fait pas dépasser le budget de 0,05 s |
-| `act()` | environ 1,2 ms | Négligeable devant le pas |
-| Mise à jour (CPU) | environ 12,6 ms | 3 000 mises à jour, soit un épisode complet de 3 000 pas, coûtent environ 38 s, contre 150 s de jeu |
-| Agent non entraîné | 0,5 à 2,5 m (stochastique), 0,0 m (déterministe), fin au pas 80 à 86 | Même comportement que la politique aléatoire (4 à 8 m) : attendu |
-| Checkpoint | identique | `save`/`load` conservent la politique |
- 
-Ce qu'on en retient pour la boucle d'entraînement :
- 
-- **Ratio mises à jour / données.** Au ratio 1:1, les mises à jour entre les épisodes ajoutent environ 25 %
-  de temps mort (38 s pour 150 s de jeu) sur CPU. C'est acceptable, et à remesurer sur la machine GPU.
-- **Pics de durée de pas.** Sous SAC, les pas les plus longs (jusqu'à 67 ms) dépassent un peu ceux de
-  `check_env.py` (52 à 61 ms). Un pas de plus de 50 ms fait rouler la voiture avec l'action précédente :
-  à surveiller pendant les vrais entraînements.
-- **Agent déterministe immobile.** Un réseau non entraîné sort une action proche de zéro : le gaz n'est pas
-  positif, la voiture ne bouge pas, et l'épisode s'arrête au pas 80 (70 pas de grâce plus 10 sans
-  progression).
-Limites : le test ne valide pas l'apprentissage. SAC doit encore être validé sur Pendulum-v1 avant de
-tirer une conclusion sur les performances. La troncation à `ep_max_length` est surtout couverte par
-`check_env.py --ep-max-length 100`, car des épisodes de 300 pas sont presque toujours terminés avant par un
-échec.
-
-## Validation de SAC sur Pendulum-v1
-
-Avant de brancher SAC sur TrackMania, on vérifie qu'il apprend sur un environnement léger où le résultat est
-connu. Si SAC échoue ici, le bug est dans l'algorithme et non dans le jeu. Cette étape ne demande pas
-TrackMania et tourne sur Mac, Windows et Linux.
-
-```bash
-uv run python scripts/validate_sac_pendulum.py --seeds 0 1 2   # entraînement + critères (de 6 à 15 min par graine sur CPU selon la machine)
-uv run python scripts/plot_sac_pendulum.py                     # courbes dans results/sac_pendulum.png
-uv run pytest tests/test_validate_sac_pendulum.py              # tests du script (quelques secondes)
-```
-
-Les hyperparamètres sont dans `configs/sac_pendulum.json` (20 000 pas, 1 000 pas aléatoires de warm-up, réseaux de
-256 unités, lr 3e-4, γ = 0,99, τ = 0,005, lots de 256, entropie cible = -1, α appris). Options du script :
-`--config`, `--seeds`, `--total-steps`, `--output-dir`.
-
-### Protocole
-
-- **Pendulum-v1** : observation de dimension 3, action de dimension 1 dans [-2, 2], épisodes de 200 pas. Il ne
-  se termine jamais (`terminated` toujours faux), il est seulement tronqué à 200 pas : c'est un bon test du
-  choix de ne stocker que `terminated` dans le replay buffer.
-- L'agent sort des actions dans [-1, 1] ; le script les multiplie par 2 avant de les envoyer à l'environnement.
-- Après le warm-up, **une mise à jour par pas** d'environnement (ratio 1:1).
-- Toutes les 2 000 pas, la politique **déterministe** est évaluée sur 10 épisodes. L'environnement d'évaluation
-  est distinct de celui d'entraînement et ses graines sont séparées de la graine d'entraînement. Elles
-  dépendent toutefois de la graine du run : chaque graine est évaluée sur 10 états de départ différents, donc un
-  écart de quelques dizaines de points entre deux graines n'est pas significatif (l'écart type entre épisodes est
-  de 65 à 110). Une évaluation a aussi lieu au pas 0 (agent non entraîné), qui doit être proche d'une politique
-  aléatoire.
-- Le script écrit `results/sac_pendulum_seed{graine}.csv` (non versionné) avec, pour chaque évaluation : le
-  retour moyen et son écart type, le retour moyen des épisodes d'entraînement, et la moyenne depuis la dernière
-  évaluation de `critic_loss`, `actor_loss`, `alpha`, `q_mean` et `entropy`.
-
-### Critères de réussite
-
-Le script sort avec le code 1 si un critère échoue, pour au moins une graine :
-
-| Critère | Seuil |
-|---------|-------|
-| Métriques de `update` | toujours finies |
-| Apprentissage | retour d'évaluation **> -250** au plus tard à 10 000 pas |
-| Stabilité | moyenne des deux dernières évaluations **> -250** (pas d'effondrement) |
-
-Repères : une politique aléatoire fait environ **-1 200** par épisode ; un SAC correct se stabilise entre -100 et
--200. On lance **3 graines** : une seule graine qui réussit ne prouve rien.
-
-### Lecture des courbes
-
-- **Retour d'évaluation** : doit monter de -1 200 vers -150 environ, puis rester stable.
-- **α** : part de 1 (`log_alpha` initialisé à 0) et diminue progressivement.
-- **Entropie** : baisse vers la cible (-1 en dimension 1) quand α se stabilise.
-- **Q moyen** : doit rester borné. Une explosion signale un problème de cible de Bellman.
-
-### Si SAC n'apprend pas
-
-Vérifier dans cet ordre :
-
-1. Échelle de l'action (×2 oublié ou appliqué deux fois).
-2. Correction tanh du log-probabilité dans `networks/sac.py`.
-3. Formes des tenseurs : `rew`, `terminated` et Q doivent être de forme `(B,)`, sinon un `(B, B)` silencieux fausse la perte.
-4. Cible de Bellman : réseaux cibles, action échantillonnée sur `next_obs`, masque `(1 - terminated)`, sous `torch.no_grad()`.
-5. Mise à jour de Polyak (τ = 0,005) et non une copie complète.
-6. Gradients : l'acteur ne doit pas modifier les critiques ; α est optimisé via `log_alpha`.
-7. Évaluation : `deterministic=True` doit utiliser `tanh(moyenne)`.
-
-### Résultats
-
-Run de 20 000 pas, évaluation tous les 2 000 pas (le « premier pas » a donc cette résolution) :
-
-| Graine | Premier pas avec retour > -250 | Retour final (moy. des 2 dernières éval.) | α final | Temps |
-|--------|-------------------------------|-------------------------------------------|---------|-------|
-| 0 | 4 000 (-154,7) | -109,4 | 0,036 | 388 s |
-| 1 | 4 000 (-248,4) | -191,2 | 0,039 | 929 s |
-| 2 | 4 000 (-198,6) | -145,3 | 0,029 | 901 s |
-
-Les trois graines respectent les critères : SAC apprend sur Pendulum-v1. Les temps varient du simple au double
-d'une graine à l'autre parce que la machine n'était pas dédiée au calcul : ils ne servent pas à mesurer le coût
-d'entraînement (voir la mesure de `sac_smoke_test.py`, environ 12,6 ms par mise à jour). La graine 1 passe le
-seuil de justesse à 4 000 pas, mais elle est à -193,8 dès 6 000 pas.
-
-Limite : cette validation montre que SAC apprend sur Pendulum-v1, pas qu'il apprendra sur TrackMania (observations
-de dimension 83, récompense creuse, contrainte temps réel).
 ## Validation de PPO sur Pendulum-v1
 
 PPO (`algos/ppo.py`, `networks/ppo.py`) est validé sur `Pendulum-v1` avant d'être branché sur le jeu.
@@ -341,6 +187,205 @@ L'agent aléatoire obtient −1 225 ± 268 sur 10 épisodes. PPO apprend en 20 0
 entre −210 et −230. L'agent n'est mis à jour qu'en fin d'épisode, une fois au moins `buffer_size` pas
 collectés, soit tous les 2 200 pas sur Pendulum. Le grand écart-type vient de quelques positions de départ depuis
 lesquelles l'agent met plus longtemps à redresser le pendule.
+
+## Replay buffer de SAC
+
+`algos/replay_buffer.py` stocke les transitions pour SAC. La boucle d'entraînement y ajoute chaque pas et tire des lots qu'elle passe à `SACAgent.update`.
+
+```python
+from algos.replay_buffer import ReplayBuffer
+buffer = ReplayBuffer(obs_dim=83, act_dim=3, capacity=100_000, device="cpu", seed=0)
+buffer.add(obs, act, rew, next_obs, terminated)
+batch = buffer.sample(256)  # dict de tenseurs float32 : obs, act, rew, next_obs, terminated
+```
+
+Choix de conception :
+- **Tampon circulaire** de tableaux numpy préalloués : une fois plein, les nouvelles transitions écrasent les plus anciennes. Une transition occupe environ 0,7 Ko (171 flottants), soit 68 Mo pour 100 000 transitions et 0,7 Go pour 1 million.
+- **Seul `terminated` est stocké, pas `truncated`**. Un épisode tronqué à `ep_max_length` aurait pu continuer : sa dernière transition doit rester bootstrapée dans la cible de Bellman. Les épisodes terminés par un échec ou par l'arrivée coupent le futur.
+- **`rew` et `terminated` ont la forme `(B,)`, pas `(B, 1)`**. Les critiques renvoient des Q de forme `(B,)` : avec une cible `(B, 1)`, le broadcasting produirait une matrice `(B, B)` sans aucune erreur, et la perte serait fausse.
+- **`seed` optionnel** : `torch.manual_seed` ne contrôle pas le tirage des lots (numpy). Sans cette graine, deux entraînements avec la même graine divergeraient, ce qui contredit le protocole « plusieurs graines ».
+- `sample` lève une `ValueError` si le tampon est vide.
+
+Tests (sans le jeu) :
+```bash
+uv run pytest tests/test_replay_buffer.py
+```
+
+## Validation de SAC sur Pendulum-v1
+
+Avant de brancher SAC (`algos/sac.py`, `networks/sac.py`, `algos/replay_buffer.py`) sur TrackMania, on vérifie
+qu'il apprend sur un environnement léger où le résultat est connu. Si SAC échoue ici, le bug est dans
+l'algorithme et non dans le jeu. Cette étape ne demande pas TrackMania et tourne sur Mac, Windows et Linux.
+
+Deux scripts entraînent le même agent avec les mêmes hyperparamètres (`configs/sac_pendulum.json` : 20 000 pas,
+1 000 pas aléatoires de warm-up, réseaux de 256 unités, lr 3e-4, γ = 0,99, τ = 0,005, lots de 256, entropie
+cible = -1, α appris à partir de 1). Ils ne diffèrent que par le moment des mises à jour :
+
+| Script | Mises à jour | Rôle |
+|--------|--------------|------|
+| `scripts/validate_sac_pendulum.py` | une à chaque pas, pendant l'épisode | SAC de référence, tel que dans l'article ; impossible dans TrackMania |
+| `scripts/train_sac.py` | autant que de pas joués, groupées en fin d'épisode | La boucle utilisée dans TrackMania, où le jeu ne se met pas en pause |
+
+```bash
+uv run python scripts/validate_sac_pendulum.py --seeds 0 1 2   # référence + critères (6 à 15 min par graine sur CPU)
+uv run python scripts/plot_sac_pendulum.py                     # courbes de la référence dans results/sac_pendulum_reference.png
+uv run python scripts/train_sac.py --config configs/sac_pendulum.json --seed 0   # boucle TrackMania
+```
+
+### Protocole
+
+- **Pendulum-v1** : observation de dimension 3, action de dimension 1 dans [-2, 2], épisodes de 200 pas. Il ne
+  se termine jamais (`terminated` toujours faux), il est seulement tronqué à 200 pas : c'est un bon test du
+  choix de ne stocker que `terminated` dans le replay buffer.
+- L'agent sort des actions dans [-1, 1] ; les scripts les multiplient par 2 avant de les envoyer à
+  l'environnement.
+- Tous les 2 000 pas, la politique **déterministe** est évaluée sur 10 épisodes, dans un environnement
+  d'évaluation distinct de celui d'entraînement. Les graines d'évaluation dépendent de la graine du run : un
+  écart de quelques dizaines de points entre deux graines n'est pas significatif (l'écart type entre épisodes est
+  de 65 à 110).
+- `validate_sac_pendulum.py` évalue aussi l'agent non entraîné au pas 0, qui doit être proche d'une politique
+  aléatoire. Il écrit `results/sac_pendulum_reference_seed<N>.csv` (retour d'évaluation et son écart type,
+  retour d'entraînement, moyennes de `critic_loss`, `actor_loss`, `alpha`, `q_mean` et `entropy`) et sort avec le
+  code 1 si un critère échoue.
+- `train_sac.py` écrit `results/sac_pendulum_seed<N>.csv`, `checkpoints/sac_pendulum_seed<N>.pt` et les logs
+  TensorBoard dans `runs/`, comme pour PPO.
+
+### Critères de réussite
+
+Pour chacune des 3 graines (une seule graine qui réussit ne prouve rien) :
+
+| Critère | Seuil |
+|---------|-------|
+| Métriques de `update` | toujours finies |
+| Apprentissage | retour d'évaluation **> -250** au plus tard à 10 000 pas |
+| Stabilité | moyenne des deux dernières évaluations **> -250** (pas d'effondrement) |
+
+Repères : une politique aléatoire fait environ **-1 200** par épisode ; un SAC correct se stabilise entre -100 et
+-200.
+
+### Résultats
+
+Runs de 20 000 pas, évaluation tous les 2 000 pas (le « premier pas » a donc cette résolution).
+
+| Graine | Référence : premier pas > -250 | Référence : retour final | Boucle TrackMania : premier pas > -250 | Boucle TrackMania : retour final |
+|--------|--------------------------------|--------------------------|----------------------------------------|----------------------------------|
+| 0 | 4 000 (-154,7) | -109,4 | 4 000 (-236) | -169 ± 92 |
+| 1 | 4 000 (-248,4) | -191,2 | 6 000 (-193) | -192 ± 76 |
+| 2 | 4 000 (-198,6) | -145,3 | 4 000 (-249) | -191 ± 75 |
+
+Le retour final de la référence est la moyenne des deux dernières évaluations, celui de la boucle TrackMania la
+dernière évaluation. Les deux versions respectent les trois critères. Grouper les mises à jour en fin d'épisode
+ralentit à peine l'apprentissage et donne des politiques finales un peu moins précises, dans la marge de
+variation entre graines : la contrainte du temps réel ne coûte presque rien à SAC. Il apprend en 4 000 à
+8 000 pas, soit environ 5 fois moins que PPO : off-policy, il réutilise chaque transition du buffer de
+nombreuses fois, alors que PPO jette son rollout après chaque mise à jour.
+
+Les durées de la référence (388 à 929 s par graine, machine d'Antoine non dédiée au calcul) ne mesurent pas le
+coût d'entraînement : voir la mesure de `sac_smoke_test.py`, environ 12,6 ms par mise à jour.
+
+Limite : cette validation montre que SAC apprend sur Pendulum-v1, pas qu'il apprendra sur TrackMania
+(observations de dimension 83, récompense creuse, contrainte temps réel).
+
+### Lecture des courbes
+
+- **Retour d'évaluation** : doit monter de -1 200 vers -150 environ, puis rester stable.
+- **α** : part de 1 (`init_alpha`) et diminue progressivement.
+- **Entropie** : baisse vers la cible (-1 en dimension 1) quand α se stabilise.
+- **Q moyen** : doit rester borné. Une explosion signale un problème de cible de Bellman.
+
+### Si SAC n'apprend pas
+
+Vérifier dans cet ordre :
+
+1. Échelle de l'action (×2 oublié ou appliqué deux fois).
+2. Correction tanh du log-probabilité dans `networks/sac.py`.
+3. Formes des tenseurs : `rew`, `terminated` et Q doivent être de forme `(B,)`, sinon un `(B, B)` silencieux fausse la perte.
+4. Cible de Bellman : réseaux cibles, action échantillonnée sur `next_obs`, masque `(1 - terminated)`, sous `torch.no_grad()`.
+5. Mise à jour de Polyak (τ = 0,005) et non une copie complète.
+6. Gradients : l'acteur ne doit pas modifier les critiques ; α est optimisé via `log_alpha`.
+7. Évaluation : `deterministic=True` doit utiliser `tanh(moyenne)`.
+
+## Test d'intégration SAC et TrackMania
+
+`scripts/sac_smoke_test.py` vérifie sur le vrai jeu que la chaîne environnement → replay buffer → agent SAC
+fonctionne, avant de lancer de longs entraînements. **Ce n'est pas un script d'entraînement** : l'agent est
+beaucoup trop peu entraîné pour apprendre quoi que ce soit.
+
+```bash
+uv run python scripts/sac_smoke_test.py
+uv run python scripts/sac_smoke_test.py --device cuda --episodes 5   # options : --help
+```
+
+Même préparation que `check_env.py` (jeu ouvert sur `tmrl-test`, fenêtré, vue cockpit, clic dans la
+fenêtre). Le script se déroule en quatre phases :
+
+1. **Warm-up** : actions aléatoires pour remplir le tampon.
+2. **Épisodes SAC** (politique stochastique, 300 pas maximum) avec des mises à jour de gradient **entre**
+   les épisodes uniquement, puisque le jeu ne se met pas en pause pendant un épisode.
+3. **Évaluation** : un épisode avec la politique déterministe.
+4. **Checkpoint** : `save` puis `load` dans un nouvel agent doivent donner la même action.
+
+Il vérifie le contrat de l'environnement (observation de 83 `float32`, 4 balayages identiques et actions
+nulles au `reset`, clés de `info`, récompense jamais négative), la validité des actions, la finitude des
+métriques de `update`, et mesure la durée de `act()`, d'un pas et d'une mise à jour. Les violations sont
+listées en fin d'exécution et le code de sortie vaut 1 s'il y en a.
+
+**Résultats** (machine d'Antoine, CPU ; réseaux de 256 unités, lots de 256 ; réglages provisoires fixés
+dans le script, à remplacer par `configs/`) :
+
+| Mesure | Valeur | Lecture |
+|--------|--------|---------|
+| Durée d'un pas avec SAC | 50,0 à 50,3 ms en moyenne, pics de 55 à 67 ms | Identique à `check_env.py` (50,0 ms) : `act()` ne fait pas dépasser le budget de 0,05 s |
+| `act()` | environ 1,2 ms | Négligeable devant le pas |
+| Mise à jour (CPU) | environ 12,6 ms | 3 000 mises à jour, soit un épisode complet de 3 000 pas, coûtent environ 38 s, contre 150 s de jeu |
+| Agent non entraîné | 0,5 à 2,5 m (stochastique), 0,0 m (déterministe), fin au pas 80 à 86 | Même comportement que la politique aléatoire (4 à 8 m) : attendu |
+| Checkpoint | identique | `save`/`load` conservent la politique |
+
+Ce qu'on en retient pour la boucle d'entraînement :
+
+- **Ratio mises à jour / données.** Au ratio 1:1, les mises à jour entre les épisodes ajoutent environ 25 %
+  de temps mort (38 s pour 150 s de jeu) sur CPU. C'est acceptable, et à remesurer sur la machine GPU.
+- **Pics de durée de pas.** Sous SAC, les pas les plus longs (jusqu'à 67 ms) dépassent un peu ceux de
+  `check_env.py` (52 à 61 ms). Un pas de plus de 50 ms fait rouler la voiture avec l'action précédente :
+  à surveiller pendant les vrais entraînements.
+- **Agent déterministe immobile.** Un réseau non entraîné sort une action proche de zéro : le gaz n'est pas
+  positif, la voiture ne bouge pas, et l'épisode s'arrête au pas 80 (70 pas de grâce plus 10 sans
+  progression).
+
+Limites : le test ne valide pas l'apprentissage (voir la validation sur Pendulum-v1 ci-dessus). La troncation
+à `ep_max_length` est surtout couverte par `check_env.py --ep-max-length 100`, car des épisodes de 300 pas
+sont presque toujours terminés avant par un échec.
+
+## Entraînement sur TrackMania
+
+Les deux scripts d'entraînement choisissent l'environnement d'après le champ `env` de la configuration :
+`"trackmania"` crée l'environnement du jeu avec `make_env`. Les mises à jour et les évaluations ont lieu en fin
+d'épisode, pendant que le jeu attend le prochain `reset()`.
+
+```bash
+uv run python scripts/train_ppo.py --config configs/ppo_trackmania.json --seed 0
+uv run python scripts/train_sac.py --config configs/sac_trackmania.json --seed 0
+uv run python scripts/run_queue.py experiments/queue.json     # enchaîne plusieurs runs sans surveillance
+uv run python scripts/evaluate.py --policy sac --config configs/sac_trackmania.json --checkpoint checkpoints/sac_trackmania_seed0.pt --episodes 10
+```
+
+Les évaluations pendant l'entraînement (3 épisodes tous les 20 000 pas) enregistrent le retour, la distance
+moyenne et le taux d'arrivée. `run_queue.py` lance chaque run dans son propre processus, écrit sa sortie dans
+`logs/` et saute les runs déjà terminés : on peut le relancer après une coupure. Le jeu doit rester au premier
+plan pendant toute la file.
+
+**Phase 1** (200 000 pas, réglages par défaut, 3 graines, sur `tmrl-test`) :
+
+| | PPO | SAC |
+|---|-----|-----|
+| Parcours terminé | jamais | les 3 graines, dès environ 60 000 pas |
+| Meilleure évaluation (m) | 1 044 / 1 285 / 1 287 | 2 059 / 1 926 / 2 055 |
+| Durée d'un run | environ 3,3 h | environ 4,2 h |
+
+SAC apprend environ 3 fois plus vite et termine le parcours de 2 059 m ; PPO bute sur trois virages, vers 97,
+835 et 1 285 m. SAC est en revanche instable : deux graines sur trois s'effondrent après avoir terminé le
+parcours. Le détail des runs, les variantes de la phase 2 et les CSV sont dans `experiments/` (voir
+`experiments/journal.md`).
 
 ## Méthode de travail
 

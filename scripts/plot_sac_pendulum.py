@@ -1,12 +1,12 @@
 """Plots the learning curves written by ``validate_sac_pendulum.py``.
 
-Reads every ``results/sac_pendulum_seed*.csv`` and draws the evaluation return, the temperature alpha, the mean
-Q value and the policy entropy against the number of steps, one line per seed.
+Reads every ``results/sac_pendulum_reference_seed*.csv`` and draws the evaluation return, the temperature
+alpha, the mean Q value and the policy entropy against the number of steps, one line per seed.
 
 Example::
 
     uv run python scripts/plot_sac_pendulum.py
-    uv run python scripts/plot_sac_pendulum.py --input-dir results --output results/sac_pendulum.png
+    uv run python scripts/plot_sac_pendulum.py --input-dir results --output results/sac_pendulum_reference.png
 """
 
 import argparse
@@ -43,13 +43,13 @@ def main():
     """Draws the figure and saves it."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--input-dir", default="results")
-    parser.add_argument("--output", default="results/sac_pendulum.png")
+    parser.add_argument("--output", default="results/sac_pendulum_reference.png")
     args = parser.parse_args()
 
-    files = sorted(Path(args.input_dir).glob("sac_pendulum_seed*.csv"))
+    files = sorted(Path(args.input_dir).glob("sac_pendulum_reference_seed*.csv"))
     if not files:
-        raise SystemExit(f"Aucun fichier sac_pendulum_seed*.csv dans {args.input_dir}")
-    runs = {f.stem.removeprefix("sac_pendulum_"): read_run(f) for f in files}
+        raise SystemExit(f"Aucun fichier sac_pendulum_reference_seed*.csv dans {args.input_dir}")
+    runs = {f.stem.removeprefix("sac_pendulum_reference_"): read_run(f) for f in files}
 
     fig, axes = plt.subplots(2, 2, figsize=(11, 7), sharex=True)
     for ax, (key, title) in zip(axes.ravel(), PANELS):
