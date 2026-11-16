@@ -7,8 +7,11 @@ mini-batch sampled from the buffer, and it is evaluated with its deterministic p
 more steps have been played. No computation interrupts an episode, which matters in TrackMania, where the
 game keeps running between two steps.
 
-The logs go to TensorBoard in ``runs/``. After each evaluation, the evaluations are written to
-``results/<config>_seed<seed>.csv`` and the agent to ``checkpoints/<config>_seed<seed>.pt``.
+The run stops after ``total_steps`` steps, or ``--max-steps``, even in the middle of an episode; a last
+evaluation then follows, unless one has just taken place. The logs go to TensorBoard in ``runs/``. After each
+evaluation, the evaluations are written to ``results/<config>_seed<seed>.csv``, the agent to
+``checkpoints/<config>_seed<seed>.pt``, and also to ``checkpoints/<config>_seed<seed>_best.pt`` when it beats
+every previous evaluation (mean distance in TrackMania, mean return otherwise).
 
 Examples:
     Train on Pendulum with the seed of the configuration::
@@ -29,7 +32,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from algos.replay_buffer import ReplayBuffer
 from algos.sac import SACAgent
-from training.common import evaluate, make_envs, save_evaluations, set_seed
+from training.common import EvaluationRecorder, make_envs, set_seed
 
 
 def main():
@@ -44,8 +47,6 @@ def main():
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     seed = config["seed"] if args.seed is None else args.seed
     name = f"{Path(args.config).stem}_seed{seed}"
-    results_file = Path("results") / f"{name}.csv"
-    checkpoint_file = Path("checkpoints") / f"{name}.pt"
     set_seed(seed)
     rng = np.random.default_rng(seed)
 
@@ -55,7 +56,7 @@ def main():
     agent = SACAgent(obs_dim, act_dim, config)
     buffer = ReplayBuffer(obs_dim, act_dim, config["buffer_size"], device=config["device"], seed=seed)
     writer = SummaryWriter(f"runs/{name}")
-    evaluations = []
+    recorder = EvaluationRecorder(name, writer)
 
     obs, _ = env.reset(seed=seed)
     agent.reset()
@@ -90,14 +91,7 @@ def main():
                 writer.add_scalar(f"train/{key}", float(np.mean([m[key] for m in metrics])), step)
 
         if step >= next_eval:
-            result = evaluate(agent, eval_env, config["eval_episodes"], seed + 1000)
-            evaluations.append({"step": step, **result})
-            for key, value in result.items():
-                writer.add_scalar(f"eval/{key}", value, step)
-            save_evaluations(evaluations, results_file)
-            agent.save(checkpoint_file)
-            summary = ", ".join(f"{key} {value:.2f}" for key, value in result.items())
-            print(f"Pas {step:7d}, épisode {episode:5d} : {summary}", flush=True)
+            recorder.evaluate(agent, eval_env, config["eval_episodes"], seed + 1000, step, episode)
             next_eval += config["eval_every"]
 
         obs, _ = env.reset()
@@ -105,12 +99,13 @@ def main():
         episode_return = 0.0
         episode_steps = 0
 
-    agent.save(checkpoint_file)
+    if not recorder.evaluations or recorder.evaluations[-1]["step"] < step:
+        recorder.evaluate(agent, eval_env, config["eval_episodes"], seed + 1000, step, episode)
     env.close()
     if eval_env is not env:
         eval_env.close()
     writer.close()
-    print(f"Évaluations dans {results_file}, agent dans {checkpoint_file}")
+    print(f"Évaluations dans {recorder.results_file}, agents dans {recorder.checkpoint_file} et {recorder.best_file}")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,9 @@
 """Pieces shared by the training scripts: seeding, environments, evaluation and results files."""
 
 import csv
+import math
 import random
+from pathlib import Path
 
 import gymnasium as gym
 import numpy as np
@@ -88,3 +90,59 @@ def save_evaluations(evaluations, path):
         csv_writer = csv.DictWriter(f, fieldnames=list(evaluations[0]))
         csv_writer.writeheader()
         csv_writer.writerows(evaluations)
+
+
+def score(result):
+    """Number used to pick the best checkpoint of a run.
+
+    Args:
+        result (dict): Result of ``evaluate``.
+
+    Returns:
+        float: Mean distance in TrackMania, mean return otherwise.
+    """
+    return result.get("mean_distance_m", result["mean_return"])
+
+
+class EvaluationRecorder:
+    """Evaluates the agent during a run and keeps its results, its last checkpoint and its best checkpoint.
+
+    Args:
+        name (str): Name of the run, ``<config>_seed<seed>``.
+        writer (SummaryWriter): TensorBoard writer of the run.
+    """
+
+    def __init__(self, name, writer):
+        self.writer = writer
+        self.results_file = Path("results") / f"{name}.csv"
+        self.checkpoint_file = Path("checkpoints") / f"{name}.pt"
+        self.best_file = Path("checkpoints") / f"{name}_best.pt"
+        self.checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
+        self.evaluations = []
+        self.best_score = -math.inf
+
+    def evaluate(self, agent, env, episodes, seed, step, episode):
+        """Evaluates the agent, logs and saves the results, and saves the agent.
+
+        The agent is always saved to ``checkpoint_file``, and also to ``best_file`` when its score is
+        strictly higher than every previous one.
+
+        Args:
+            agent (PPOAgent | SACAgent): Agent to evaluate.
+            env (gymnasium.Env): Evaluation environment.
+            episodes (int): Number of episodes.
+            seed (int): Seed of the first episode.
+            step (int): Number of training steps played so far.
+            episode (int): Number of training episodes finished so far.
+        """
+        result = evaluate(agent, env, episodes, seed)
+        self.evaluations.append({"step": step, **result})
+        for key, value in result.items():
+            self.writer.add_scalar(f"eval/{key}", value, step)
+        save_evaluations(self.evaluations, self.results_file)
+        agent.save(self.checkpoint_file)
+        if score(result) > self.best_score:
+            self.best_score = score(result)
+            agent.save(self.best_file)
+        summary = ", ".join(f"{key} {value:.2f}" for key, value in result.items())
+        print(f"Pas {step:7d}, épisode {episode:5d} : {summary}", flush=True)

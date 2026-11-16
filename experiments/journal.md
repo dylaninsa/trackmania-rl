@@ -39,3 +39,7 @@ suite, ils ne prouvent rien.
 | `sac_trackmania_lr1e3` | `lr` 3e-4 → 1e-3 | Dylan | 8 / 14 | 97 / 12 | Bloqué : à écarter. |
 
 ## Phase 3 : amélioration de l'algorithme retenu
+
+Depuis cette phase, chaque run se termine par une évaluation au dernier pas et garde aussi son meilleur agent
+dans `checkpoints/<run>_best.pt` (meilleure distance moyenne). Les résultats finaux s'obtiennent en évaluant
+ce checkpoint sur 10 épisodes avec `scripts/evaluate.py`.
