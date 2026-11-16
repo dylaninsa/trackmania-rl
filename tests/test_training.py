@@ -8,7 +8,7 @@ import gymnasium as gym
 import numpy as np
 import pytest
 
-from training.common import evaluate, make_envs, save_evaluations
+from training.common import EvaluationRecorder, evaluate, make_envs, save_evaluations, score
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 COMMON = {"env": "Pendulum-v1", "seed": 0, "ep_max_length": 200, "eval_episodes": 1, "device": "cpu"}
@@ -96,6 +96,7 @@ def run_script(script, config, tmp_path, monkeypatch, extra_args=()):
     monkeypatch.setattr(sys, "argv", [script, "--config", str(config_file), "--seed", "3", *extra_args])
     runpy.run_path(str(SCRIPTS / script), run_name="__main__")
     assert (tmp_path / "checkpoints" / "tiny_seed3.pt").exists()
+    assert (tmp_path / "checkpoints" / "tiny_seed3_best.pt").exists()
     with open(tmp_path / "results" / "tiny_seed3.csv", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
@@ -224,3 +225,67 @@ def test_max_steps_stops_before_total_steps(script, config, tmp_path, monkeypatc
     rows = run_script(script, config, tmp_path, monkeypatch, extra_args=("--max-steps", "200"))
 
     assert [int(row["step"]) for row in rows] == [200]
+
+
+@pytest.mark.parametrize("script, config", [("train_ppo.py", PPO_CONFIG), ("train_sac.py", SAC_CONFIG)])
+def test_final_evaluation_when_the_run_stops_inside_an_episode(script, config, tmp_path, monkeypatch):
+    rows = run_script(script, config, tmp_path, monkeypatch, extra_args=("--max-steps", "300"))
+
+    assert [int(row["step"]) for row in rows] == [200, 300]
+
+
+class SavingAgent(ConstantAgent):
+    """Constant agent whose ``save`` records which evaluation each file comes from."""
+
+    def __init__(self):
+        super().__init__(np.zeros(3, dtype=np.float32))
+        self.saves = []
+
+    def save(self, path):
+        """Records the save instead of writing a file.
+
+        Args:
+            path (pathlib.Path): Destination file.
+        """
+        self.saves.append((path.name, self.resets))
+
+
+class FakeWriter:
+    """TensorBoard writer that keeps the scalars in a list."""
+
+    def __init__(self):
+        self.scalars = []
+
+    def add_scalar(self, tag, value, step):
+        """Records a scalar.
+
+        Args:
+            tag (str): Name of the scalar.
+            value (float): Value.
+            step (int): Step.
+        """
+        self.scalars.append((tag, value, step))
+
+
+def test_score_uses_distance_in_trackmania_and_return_otherwise():
+    assert score({"mean_return": -150.0, "std_return": 3.0}) == -150.0
+    assert score({"mean_return": 80.0, "std_return": 0.0, "mean_distance_m": 1287.0, "finish_rate": 0.0}) == 1287.0
+
+
+def test_recorder_keeps_the_first_best_evaluation(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    env = FakeTrackEnv([(100.0, False), (2059.0, True), (2059.0, True), (40.0, False)])
+    agent = SavingAgent()
+    writer = FakeWriter()
+    recorder = EvaluationRecorder("run_seed0", writer)
+
+    for step in [10, 20, 30, 40]:
+        recorder.evaluate(agent, env, episodes=1, seed=0, step=step, episode=step // 10)
+
+    assert [name for name, _ in agent.saves if name == "run_seed0.pt"] == ["run_seed0.pt"] * 4
+    assert [evaluation for name, evaluation in agent.saves if name == "run_seed0_best.pt"] == [1, 2]
+    assert recorder.best_score == 2059.0
+    assert ("eval/mean_distance_m", 40.0, 40) in writer.scalars
+    with open(tmp_path / "results" / "run_seed0.csv", encoding="utf-8") as f:
+        assert [row["step"] for row in csv.DictReader(f)] == ["10", "20", "30", "40"]
+    assert (tmp_path / "checkpoints").is_dir()

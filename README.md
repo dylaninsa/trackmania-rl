@@ -168,8 +168,8 @@ uv run python scripts/train_ppo.py --config configs/ppo_pendulum.json --seed 0
 ```
 
 Le script écrit les logs TensorBoard dans `runs/`, les évaluations dans `results/ppo_pendulum_seed<N>.csv`
-et l'agent final dans `checkpoints/ppo_pendulum_seed<N>.pt`. Une évaluation joue 10 épisodes avec la
-politique déterministe, tous les 5 000 pas.
+et l'agent dans `checkpoints/ppo_pendulum_seed<N>.pt` (le dernier) et `checkpoints/ppo_pendulum_seed<N>_best.pt`
+(le meilleur). Une évaluation joue 10 épisodes avec la politique déterministe, tous les 5 000 pas.
 
 **Critère de validation :** un retour moyen en évaluation supérieur à −250 sur les 3 graines, soit environ
 1 000 points de mieux que l'agent aléatoire. Il est moins strict que celui de SAC (−200) : PPO, on-policy,
@@ -247,8 +247,8 @@ uv run python scripts/train_sac.py --config configs/sac_pendulum.json --seed 0  
   aléatoire. Il écrit `results/sac_pendulum_reference_seed<N>.csv` (retour d'évaluation et son écart type,
   retour d'entraînement, moyennes de `critic_loss`, `actor_loss`, `alpha`, `q_mean` et `entropy`) et sort avec le
   code 1 si un critère échoue.
-- `train_sac.py` écrit `results/sac_pendulum_seed<N>.csv`, `checkpoints/sac_pendulum_seed<N>.pt` et les logs
-  TensorBoard dans `runs/`, comme pour PPO.
+- `train_sac.py` écrit `results/sac_pendulum_seed<N>.csv`, `checkpoints/sac_pendulum_seed<N>.pt`,
+  `checkpoints/sac_pendulum_seed<N>_best.pt` et les logs TensorBoard dans `runs/`, comme pour PPO.
 
 ### Critères de réussite
 
@@ -366,11 +366,16 @@ d'épisode, pendant que le jeu attend le prochain `reset()`.
 uv run python scripts/train_ppo.py --config configs/ppo_trackmania.json --seed 0
 uv run python scripts/train_sac.py --config configs/sac_trackmania.json --seed 0
 uv run python scripts/run_queue.py experiments/queue.json     # enchaîne plusieurs runs sans surveillance
-uv run python scripts/evaluate.py --policy sac --config configs/sac_trackmania.json --checkpoint checkpoints/sac_trackmania_seed0.pt --episodes 10
+uv run python scripts/evaluate.py --policy sac --config configs/sac_trackmania.json --checkpoint checkpoints/sac_trackmania_seed0_best.pt --episodes 10
 ```
 
 Les évaluations pendant l'entraînement (3 épisodes tous les 20 000 pas) enregistrent le retour, la distance
-moyenne et le taux d'arrivée. `run_queue.py` lance chaque run dans son propre processus, écrit sa sortie dans
+moyenne et le taux d'arrivée. Le run s'arrête au pas `total_steps` (ou `--max-steps`), même en plein épisode,
+puis l'agent est évalué une dernière fois. Chaque évaluation sauvegarde l'agent dans
+`checkpoints/<run>.pt`, et dans `checkpoints/<run>_best.pt` s'il bat toutes les évaluations précédentes en
+distance moyenne : SAC pouvant s'effondrer en fin de run, c'est ce checkpoint qu'on évalue sur 10 épisodes
+avec `evaluate.py`. Son score à l'entraînement, choisi parmi plusieurs évaluations de 3 épisodes, est
+optimiste ; seul celui de `evaluate.py` compte. `run_queue.py` lance chaque run dans son propre processus, écrit sa sortie dans
 `logs/` et saute les runs déjà terminés : on peut le relancer après une coupure. Le jeu doit rester au premier
 plan pendant toute la file.
 
@@ -384,7 +389,8 @@ plan pendant toute la file.
 
 SAC apprend environ 3 fois plus vite et termine le parcours de 2 059 m ; PPO bute sur trois virages, vers 97,
 835 et 1 285 m. SAC est en revanche instable : deux graines sur trois s'effondrent après avoir terminé le
-parcours. Le détail des runs, les variantes de la phase 2 et les CSV sont dans `experiments/` (voir
+parcours. Ces runs datent d'avant l'évaluation finale et `_best.pt` : leur dernière évaluation a eu lieu
+vers 180 000 pas, et seul l'agent final a été gardé. Le détail des runs, les variantes de la phase 2 et les CSV sont dans `experiments/` (voir
 `experiments/journal.md`).
 
 ## Méthode de travail
