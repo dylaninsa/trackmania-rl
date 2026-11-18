@@ -3,8 +3,9 @@
 Une ligne par run lancé, y compris les runs ratés ou coupés : ils expliquent les choix. Le nom du run est
 `<config>_seed<graine>`, comme les fichiers de `results/` et `checkpoints/`.
 
-Les CSV des runs rapportés dans le rapport sont copiés dans `experiments/<nom du run>/`. Les checkpoints
-finaux vont sur le Drive du groupe.
+`run_queue.py` copie le CSV, le log et les logs TensorBoard de chaque run réussi dans
+`experiments/<nom du run>/` ; on les commite avec la ligne du journal. Les checkpoints `_best.pt` vont sur le
+Drive du groupe.
 
 ## Phase 1 : comparaison avec les réglages par défaut (200 000 pas, 3 graines)
 
@@ -43,3 +44,22 @@ suite, ils ne prouvent rien.
 Depuis cette phase, chaque run se termine par une évaluation au dernier pas et garde aussi son meilleur agent
 dans `checkpoints/<run>_best.pt` (meilleure distance moyenne). Les résultats finaux s'obtiennent en évaluant
 ce checkpoint sur 10 épisodes avec `scripts/evaluate.py`.
+
+**Objectif :** un SAC qui termine le parcours sur toutes les graines et le reste jusqu'à la fin du run.
+**Critère de réussite**, fixé avant les runs : sur chaque graine, au moins 2 arrivées sur 3 à chacune des trois
+dernières évaluations (160 000, 180 000 et 200 000 pas).
+
+### Phase 3a : stabilité (200 000 pas, graines 0 à 3, une graine par machine)
+
+| Configuration | Changement | Rôle |
+|---------------|------------|------|
+| `sac_trackmania_p3_base` | `init_alpha` 0,1 et `updates_per_step` 0,5 | les deux gagnants de la phase 2, combinés |
+| `sac_trackmania_p3_lr1e4` | base + `lr` 1e-4 | des pas plus petits, pour des critiques plus stables |
+| `sac_trackmania_p3_gamma995` | base + `gamma` 0,995 | un horizon plus long (environ 10 s au lieu de 5 s) |
+
+Chaque machine lance `experiments/queue_phase3a_seed<N>.json` : les 3 configurations avec sa graine, dans un
+ordre décalé d'une machine à l'autre pour que chaque configuration ait une graine terminée après la première
+nuit.
+
+| Date | Membre | Run | Machine | Dernière éval. (m) | Meilleure éval. (m) | Arrivées aux 3 dernières éval. | Remarque |
+|------|--------|-----|---------|--------------------|---------------------|--------------------------------|----------|

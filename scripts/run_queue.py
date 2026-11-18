@@ -2,8 +2,9 @@
 
 The queue is a JSON list of runs ``{"algo": "ppo" | "sac", "config": ..., "seed": ..., "max_steps": ...}``,
 ``max_steps`` being optional. Each run is launched in its own process and its output goes to
-``logs/<config>_seed<seed>.log``. A run that ends without error leaves a ``logs/<config>_seed<seed>.done``
-marker, and the runs that have one are skipped, so that the queue can be restarted after an interruption
+``logs/<config>_seed<seed>.log``. When a run ends without error, its evaluations, its log and its TensorBoard
+logs are copied to ``experiments/<config>_seed<seed>/`` (``eval.csv``, ``train.log``, ``tensorboard/``), to be
+committed, and it leaves a ``logs/<config>_seed<seed>.done`` marker. The runs that have one are skipped, so that the queue can be restarted after an interruption
 without redoing the finished runs. A run that crashes is reported and the queue goes on.
 
 Example::
@@ -54,6 +55,21 @@ def command(run):
     return args
 
 
+def archive(name, logs):
+    """Copies the files of a finished run to ``experiments/<name>/``, so that they can be committed.
+
+    Args:
+        name (str): Name of the run.
+        logs (pathlib.Path): Folder of the logs.
+    """
+    folder = Path("experiments") / name
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    shutil.copy(Path("results") / f"{name}.csv", folder / "eval.csv")
+    shutil.copy(logs / f"{name}.log", folder / "train.log")
+    shutil.copytree(Path("runs") / name, folder / "tensorboard")
+
+
 def main():
     """Runs every unfinished run of the queue given on the command line."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -81,8 +97,9 @@ def main():
         hours = (time.time() - start) / 3600
 
         if code == 0:
+            archive(name, logs)
             done_file.write_text(f"{datetime.now():%Y-%m-%d %H:%M}, {hours:.2f} h\n", encoding="utf-8")
-            print(f"    terminé en {hours:.1f} h", flush=True)
+            print(f"    terminé en {hours:.1f} h, résultats copiés dans experiments/{name}", flush=True)
         else:
             print(f"    ÉCHEC (code {code}) après {hours:.1f} h, voir {logs / name}.log", flush=True)
 
