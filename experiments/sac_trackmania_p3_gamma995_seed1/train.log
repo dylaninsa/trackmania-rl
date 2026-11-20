@@ -1,0 +1,67 @@
+Pas   20147, épisode   114 : mean_return 14.63, std_return 3.44, mean_distance_m 146.27, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.056589300045743585
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas   40077, épisode   220 : mean_return 9.46, std_return 0.29, mean_distance_m 94.57, finish_rate 0.00
+Pas   60227, épisode   288 : mean_return 82.97, std_return 0.08, mean_distance_m 829.73, finish_rate 0.00
+Pas   80665, épisode   328 : mean_return 58.29, std_return 35.29, mean_distance_m 582.87, finish_rate 0.00
+Pas  100537, épisode   389 : mean_return 81.77, std_return 1.78, mean_distance_m 817.73, finish_rate 0.00
+Pas  120075, épisode   437 : mean_return 83.54, std_return 0.67, mean_distance_m 835.40, finish_rate 0.00
+Pas  140296, épisode   481 : mean_return 81.80, std_return 1.81, mean_distance_m 817.97, finish_rate 0.00
+Pas  160401, épisode   524 : mean_return 80.62, std_return 1.83, mean_distance_m 806.23, finish_rate 0.00
+Pas  180145, épisode   556 : mean_return 80.81, std_return 1.94, mean_distance_m 808.10, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.09675640205387026
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.11911450390471146
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.056546400126535445
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.06873470020946115
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.06852460012305528
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.08820930006913841
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.09622640034649521
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.0510815002489835
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.1230638999841176
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.06497740000486374
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.07071450003422797
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.09637940040556714
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.0794372001546435
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.0811103000305593
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.16298510000342503
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.08768160006729886
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05479180021211505
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.054705200192984194
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.0904990000417456
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05257900001015514
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.07258720003301278
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.07763990003149956
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.058072400046512485
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05236130068078637
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.11109560349723324
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.09209059999557212
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 1.5112379000638612
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  200000, épisode   595 : mean_return 32.93, std_return 32.68, mean_distance_m 329.30, finish_rate 0.00
+Évaluations dans results\sac_trackmania_p3_gamma995_seed1.csv, agents dans checkpoints\sac_trackmania_p3_gamma995_seed1.pt et checkpoints\sac_trackmania_p3_gamma995_seed1_best.pt
