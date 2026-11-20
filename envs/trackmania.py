@@ -18,6 +18,13 @@ Attributes:
     SPEED_SCALE (float): Speed normalization constant. The speed peaks around 80 m/s on tmrl-test.
     LIDAR_SCALE (float): LIDAR normalization constant. The longest beam observed on tmrl-test is 483 px.
     DEFAULT_REWARD_PATH (pathlib.Path): Demonstration trajectory of the tmrl-test track.
+    GAMEPAD_PLUG_TIMEOUT (float): Seconds to wait for Windows to install the virtual gamepad.
+    GAMEPAD_POLL_DELAY (float): Seconds between two checks that the virtual gamepad is installed.
+    VIGEM_ERROR_NONE (int): ViGEmBus code of a gamepad created without error.
+    VIGEM_ERROR_TARGET_NOT_PLUGGED_IN (int): ViGEmBus code of a gamepad that Windows has not installed in time.
+    VIGEM_TARGET_STATE_OFFSET (int): Offset in bytes of the state field in ViGEm's ``VIGEM_TARGET_T`` structure,
+        after its ``ULONG Size`` and ``USHORT SerialNo`` fields.
+    VIGEM_TARGET_CONNECTED (int): Value of that state field for a connected gamepad.
 """
 
 import time
@@ -39,42 +46,99 @@ ACTIONS = slice(77, 83)
 SPEED_SCALE = 100.0
 LIDAR_SCALE = 500.0
 DEFAULT_REWARD_PATH = Path(__file__).resolve().parents[1] / "data" / "reward" / "tmrl-test.pkl"
-GAMEPAD_ATTEMPTS = 5
-GAMEPAD_RETRY_DELAY = 1.0
+GAMEPAD_PLUG_TIMEOUT = 30.0
+GAMEPAD_POLL_DELAY = 0.2
+
+VIGEM_ERROR_NONE = 0x20000000
+VIGEM_ERROR_TARGET_NOT_PLUGGED_IN = 0xE0000007
+VIGEM_TARGET_STATE_OFFSET = 8
+VIGEM_TARGET_CONNECTED = 2
 
 
-def use_retrying_gamepad():
-    """Makes TMRL create its virtual gamepad with several attempts.
+def gamepad_present(serial):
+    """Tells whether Windows has finished installing the virtual Xbox 360 pad with this ViGEm serial.
 
-    ViGEmBus gives up after about 1 s when Windows is slow to install the virtual controller, which often
-    happens on the first attempt after a while without one. vgamepad then raises "The virtual device could
-    not connect to ViGEmBus", while a second attempt succeeds. TMRL looks up ``vgamepad.VX360Gamepad`` when
-    it initializes, so replacing it there is enough.
+    Args:
+        serial (int): Serial number given by ViGEmBus, which is also the end of the USB instance ID.
+
+    Returns:
+        bool: True if the device is present.
     """
+    import ctypes
+
+    devinst = ctypes.c_uint32()
+    instance_id = f"USB\\VID_045E&PID_028E\\{serial:02d}"
+    return ctypes.windll.cfgmgr32.CM_Locate_DevNodeW(ctypes.byref(devinst), instance_id, 0) == 0
+
+
+def use_patient_gamepad():
+    """Makes TMRL create a single virtual gamepad, waiting as long as Windows needs to install it.
+
+    ViGEmBus gives up after 1 s when Windows is slow to install the virtual controller, which often happens
+    on the first pad after a while without one. vgamepad then raises "The virtual device could not connect to
+    ViGEmBus", but the pad does get plugged in a few seconds later. The client marked it as not connected,
+    so it would refuse to send it any input or to remove it. Creating a new pad instead leaves the first one
+    plugged: the game then listens to a pad that never moves, and the car stands still. So the pad is created
+    once, Windows is polled until it is present, and the client is told it is connected. TMRL looks up
+    ``vgamepad.VX360Gamepad`` when it initializes, so replacing it there is enough.
+
+    Raises:
+        RuntimeError: When the pad is created, if it is still absent after ``GAMEPAD_PLUG_TIMEOUT`` seconds.
+    """
+    import ctypes
+
     import vgamepad
     import vgamepad.win.vigem_client as vcli
+    from vgamepad.win.virtual_gamepad import VBUS
 
-    if getattr(vgamepad.VX360Gamepad, "retries", False):
+    if getattr(vgamepad.VX360Gamepad, "patient", False):
         return
 
-    class RetryingX360Gamepad(vgamepad.VX360Gamepad):
-        retries = True
+    class PatientX360Gamepad(vgamepad.VX360Gamepad):
+        """Virtual Xbox 360 gamepad that waits for Windows to install it instead of failing after 1 s."""
+
+        patient = True
 
         def __init__(self):
-            for attempt in range(1, GAMEPAD_ATTEMPTS + 1):
-                try:
-                    super().__init__()
-                    return
-                except AssertionError:
-                    if attempt == GAMEPAD_ATTEMPTS:
-                        raise
-                    # Frees the target that failed to attach before allocating a new one.
-                    vcli.vigem_target_remove(self._busp, self._devicep)
-                    vcli.vigem_target_free(self._devicep)
-                    print(f"Manette virtuelle non connectée, nouvel essai ({attempt}/{GAMEPAD_ATTEMPTS - 1})")
-                    time.sleep(GAMEPAD_RETRY_DELAY)
+            """Creates the gamepad like ``VGamepad.__init__``, except when Windows is slow to install it.
 
-    vgamepad.VX360Gamepad = RetryingX360Gamepad
+            Raises:
+                RuntimeError: If ViGEmBus fails for another reason, or if the gamepad is still absent after
+                    ``GAMEPAD_PLUG_TIMEOUT`` seconds.
+            """
+            self.vbus = VBUS
+            self._busp = VBUS.get_busp()
+            self._devicep = self.target_alloc()
+            self.CMPFUNC = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ubyte,
+                                            ctypes.c_ubyte, ctypes.c_ubyte, ctypes.c_void_p)
+            self.cmp_func = None
+            code = vcli.vigem_target_add(self._busp, self._devicep)
+            if code == VIGEM_ERROR_TARGET_NOT_PLUGGED_IN:
+                self.wait_until_plugged()
+            elif code != VIGEM_ERROR_NONE:
+                raise RuntimeError(f"ViGEmBus n'a pas pu créer la manette virtuelle (code {code:#x})")
+            self.report = self.get_default_report()
+            self.update()
+
+        def wait_until_plugged(self):
+            """Polls Windows until the gamepad is present, then marks it as connected in the ViGEm client.
+
+            Raises:
+                RuntimeError: If the gamepad is still absent after ``GAMEPAD_PLUG_TIMEOUT`` seconds.
+            """
+            serial = vcli.vigem_target_get_index(self._devicep)
+            print(f"Manette virtuelle lente à s'installer, attente (n° {serial})", flush=True)
+            deadline = time.time() + GAMEPAD_PLUG_TIMEOUT
+            while not gamepad_present(serial):
+                if time.time() > deadline:
+                    raise RuntimeError(f"La manette virtuelle n° {serial} n'est pas apparue dans Windows "
+                                       f"après {GAMEPAD_PLUG_TIMEOUT:.0f} s")
+                time.sleep(GAMEPAD_POLL_DELAY)
+            state = ctypes.c_int.from_address(self._devicep + VIGEM_TARGET_STATE_OFFSET)
+            state.value = VIGEM_TARGET_CONNECTED
+            print("Manette virtuelle connectée", flush=True)
+
+    vgamepad.VX360Gamepad = PatientX360Gamepad
 
 
 class LidarInterface(TM2020InterfaceLidar):
@@ -91,7 +155,7 @@ class LidarInterface(TM2020InterfaceLidar):
 
     def initialize(self):
         """Connects to the game, then replaces TMRL's reward function with one that reads our trajectory."""
-        use_retrying_gamepad()
+        use_patient_gamepad()
         super().initialize()
         self.reward_function = TrajectoryReward(load_trajectory(self.reward_path))
 
