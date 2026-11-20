@@ -10,6 +10,11 @@ FAKE_TRAINING = """import json, sys
 from pathlib import Path
 with open("calls.jsonl", "a", encoding="utf-8") as f:
     f.write(json.dumps(sys.argv[1:]) + "\\n")
+name = Path(sys.argv[2]).stem + "_seed" + sys.argv[4]
+Path("results").mkdir(exist_ok=True)
+Path("results", name + ".csv").write_text("step,mean_return\\n200,1.0\\n", encoding="utf-8")
+Path("runs", name).mkdir(parents=True, exist_ok=True)
+Path("runs", name, "events.new").write_text("", encoding="utf-8")
 print("Pas 200 : é")
 sys.exit({code})
 """
@@ -105,3 +110,22 @@ def test_queue_clears_the_tensorboard_folder_of_the_run(run_queue, tmp_path, mon
 
     assert not old.exists()
     assert kept.exists()
+
+
+def test_queue_copies_the_files_of_successful_runs_to_experiments(run_queue, tmp_path, monkeypatch):
+    stale = tmp_path / "experiments" / "b_seed0" / "stale.csv"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("", encoding="utf-8")
+    runs = [
+        {"algo": "sac", "config": "configs/a.json", "seed": 0},
+        {"algo": "ppo", "config": "configs/b.json", "seed": 0},
+    ]
+
+    start_queue(run_queue, runs, tmp_path, monkeypatch)
+
+    folder = tmp_path / "experiments" / "b_seed0"
+    assert sorted(p.name for p in folder.iterdir()) == ["eval.csv", "tensorboard", "train.log"]
+    assert (folder / "eval.csv").read_text(encoding="utf-8").startswith("step,mean_return")
+    assert "Pas 200 : é" in (folder / "train.log").read_text(encoding="utf-8")
+    assert (folder / "tensorboard" / "events.new").exists()
+    assert not (tmp_path / "experiments" / "a_seed0").exists()
