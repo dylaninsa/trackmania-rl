@@ -1,0 +1,46 @@
+Manette virtuelle non connectée, nouvel essai (1/4)
+Manette virtuelle non connectée, nouvel essai (2/4)
+Manette virtuelle non connectée, nouvel essai (3/4)
+Pas   20011, épisode   191 : mean_return 0.00, std_return 0.00, mean_distance_m 0.00, finish_rate 0.00
+Pas   40364, épisode   333 : mean_return 0.00, std_return 0.00, mean_distance_m 0.00, finish_rate 0.00
+Pas   60356, épisode   361 : mean_return 198.37, std_return 76.22, mean_distance_m 1650.40, finish_rate 0.33
+Pas   80427, épisode   377 : mean_return 202.24, std_return 74.20, mean_distance_m 1689.07, finish_rate 0.33
+Pas  101013, épisode   392 : mean_return 249.13, std_return 80.26, mean_distance_m 1824.60, finish_rate 0.67
+Pas  120159, épisode   413 : mean_return 138.07, std_return 38.78, mean_distance_m 1380.67, finish_rate 0.00
+Pas  141064, épisode   449 : mean_return 231.44, std_return 105.17, mean_distance_m 1647.77, finish_rate 0.67
+Pas  161044, épisode   468 : mean_return 157.32, std_return 105.05, mean_distance_m 1239.83, finish_rate 0.33
+Pas  180747, épisode   488 : mean_return 33.84, std_return 34.97, mean_distance_m 338.37, finish_rate 0.00
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05709690082585439
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.10249850002583116
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.9836432025185786
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Traceback (most recent call last):
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\scripts\train_sac.py", line 112, in <module>
+    main()
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\scripts\train_sac.py", line 89, in main
+    metrics.append(agent.update(buffer.sample(config["batch_size"])))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\algos\sac.py", line 184, in update
+    update_actor_loss, update_alpha_loss, alpha, entropy = self.update_actor_and_alpha(batch)
+                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\algos\sac.py", line 146, in update_actor_and_alpha
+    self.actor_optimizer.step()
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\torch\optim\optimizer.py", line 549, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\torch\optim\optimizer.py", line 79, in _use_grad
+    ret = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\torch\optim\adam.py", line 248, in step
+    adam(
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\torch\optim\optimizer.py", line 157, in maybe_fallback
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\torch\optim\adam.py", line 970, in adam
+    func(
+  File "C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\torch\optim\adam.py", line 430, in _single_tensor_adam
+    if torch.is_complex(param):
+       ^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt

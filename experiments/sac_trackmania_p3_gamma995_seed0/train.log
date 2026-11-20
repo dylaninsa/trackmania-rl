@@ -1,0 +1,17 @@
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.0799816000071587
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.12122020003516809
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas   21331, épisode   134 : mean_return 7.98, std_return 3.98, mean_distance_m 79.77, finish_rate 0.00
+Pas   42402, épisode   188 : mean_return 213.02, std_return 65.66, mean_distance_m 1796.90, finish_rate 0.33
+Pas   61810, épisode   199 : mean_return 83.36, std_return 0.02, mean_distance_m 833.63, finish_rate 0.00
+Pas   81255, épisode   216 : mean_return 259.68, std_return 65.33, mean_distance_m 1930.17, finish_rate 0.67
+Pas  100220, épisode   228 : mean_return 249.15, std_return 80.23, mean_distance_m 1824.80, finish_rate 0.67
+Pas  121114, épisode   244 : mean_return 259.26, std_return 65.91, mean_distance_m 1925.93, finish_rate 0.67
+Pas  140175, épisode   258 : mean_return 185.81, std_return 91.33, mean_distance_m 1524.77, finish_rate 0.33
+Pas  160408, épisode   271 : mean_return 9.82, std_return 0.04, mean_distance_m 98.23, finish_rate 0.00
+Pas  180556, épisode   289 : mean_return 259.45, std_return 65.66, mean_distance_m 1927.87, finish_rate 0.67
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 1.5176331968978047
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  200000, épisode   302 : mean_return 212.46, std_return 66.06, mean_distance_m 1791.27, finish_rate 0.33
+Évaluations dans results\sac_trackmania_p3_gamma995_seed0.csv, agents dans checkpoints\sac_trackmania_p3_gamma995_seed0.pt et checkpoints\sac_trackmania_p3_gamma995_seed0_best.pt
