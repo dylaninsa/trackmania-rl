@@ -1,0 +1,17 @@
+Pas   20127, épisode   124 : mean_return 15.92, std_return 0.00, mean_distance_m 159.17, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05096539354417473
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas   40092, épisode   240 : mean_return 9.56, std_return 0.01, mean_distance_m 95.57, finish_rate 0.00
+Pas   60082, épisode   391 : mean_return 9.97, std_return 0.04, mean_distance_m 99.73, finish_rate 0.00
+Pas   80128, épisode   556 : mean_return 9.57, std_return 0.09, mean_distance_m 95.67, finish_rate 0.00
+Pas  100058, épisode   699 : mean_return 34.26, std_return 33.88, mean_distance_m 342.60, finish_rate 0.00
+Pas  120035, épisode   849 : mean_return 9.59, std_return 0.07, mean_distance_m 95.87, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.053752096253447235
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  140088, épisode   991 : mean_return 9.77, std_return 0.24, mean_distance_m 97.73, finish_rate 0.00
+Pas  160498, épisode  1056 : mean_return 34.29, std_return 34.62, mean_distance_m 342.87, finish_rate 0.00
+Pas  180020, épisode  1158 : mean_return 9.81, std_return 0.03, mean_distance_m 98.13, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 1.5193361948477104
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  200000, épisode  1294 : mean_return 34.12, std_return 34.47, mean_distance_m 341.23, finish_rate 0.00
+Évaluations dans results\sac_trackmania_p3_base_seed2.csv, agents dans checkpoints\sac_trackmania_p3_base_seed2.pt et checkpoints\sac_trackmania_p3_base_seed2_best.pt

@@ -1,0 +1,23 @@
+Pas   20037, épisode   117 : mean_return 15.68, std_return 0.04, mean_distance_m 156.77, finish_rate 0.00
+Pas   40485, épisode   204 : mean_return 32.28, std_return 24.59, mean_distance_m 322.80, finish_rate 0.00
+Pas   60232, épisode   292 : mean_return 13.56, std_return 1.61, mean_distance_m 135.63, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05453879025299102
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas   80137, épisode   342 : mean_return 23.20, std_return 0.30, mean_distance_m 232.00, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05156257061753422
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.0535594942048192
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  100020, épisode   386 : mean_return 15.61, std_return 0.14, mean_distance_m 156.10, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05060539161786437
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  120626, épisode   422 : mean_return 44.76, std_return 26.76, mean_distance_m 447.57, finish_rate 0.00
+Pas  140175, épisode   461 : mean_return 77.35, std_return 4.38, mean_distance_m 773.47, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05134727666154504
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  160387, épisode   492 : mean_return 82.18, std_return 0.07, mean_distance_m 821.77, finish_rate 0.00
+Pas  181403, épisode   525 : mean_return 81.58, std_return 1.37, mean_distance_m 815.80, finish_rate 0.00
+C:\Users\antoi\Documents_local\dossier_poly_Montréal\cours - Poly Montréal\MTI881 - Apprentissage par renforcement\projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 1.508450198569335
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  200000, épisode   554 : mean_return 58.38, std_return 34.65, mean_distance_m 583.77, finish_rate 0.00
+Évaluations dans results\sac_trackmania_p3_gamma995_seed2.csv, agents dans checkpoints\sac_trackmania_p3_gamma995_seed2.pt et checkpoints\sac_trackmania_p3_gamma995_seed2_best.pt
