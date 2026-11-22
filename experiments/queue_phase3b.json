@@ -1,0 +1,17 @@
+[
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania_p3_base.json",
+    "seed": 4
+  },
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania_p3_base.json",
+    "seed": 5
+  },
+  {
+    "algo": "sac",
+    "config": "configs/sac_trackmania_p3_base.json",
+    "seed": 6
+  }
+]
