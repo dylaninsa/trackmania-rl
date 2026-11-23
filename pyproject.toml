@@ -26,3 +26,9 @@ packages = ["envs", "baselines", "networks", "algos", "training"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'win32'"
+]

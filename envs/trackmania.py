@@ -29,6 +29,7 @@ Attributes:
 
 import time
 from pathlib import Path
+import sys
 
 import gymnasium
 import numpy as np
@@ -64,6 +65,9 @@ def gamepad_present(serial):
     Returns:
         bool: True if the device is present.
     """
+    if sys.platform != "win32":
+        return True
+
     import ctypes
 
     devinst = ctypes.c_uint32()
@@ -85,6 +89,9 @@ def use_patient_gamepad():
     Raises:
         RuntimeError: When the pad is created, if it is still absent after ``GAMEPAD_PLUG_TIMEOUT`` seconds.
     """
+    if sys.platform != "win32":
+        return
+
     import ctypes
 
     import vgamepad
@@ -139,7 +146,6 @@ def use_patient_gamepad():
             print("Manette virtuelle connectée", flush=True)
 
     vgamepad.VX360Gamepad = PatientX360Gamepad
-
 
 class LidarInterface(TM2020InterfaceLidar):
     """TMRL LIDAR interface that reads our trajectory and reports progress in ``info``.
