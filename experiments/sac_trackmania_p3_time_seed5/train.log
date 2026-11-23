@@ -1,0 +1,23 @@
+Manette virtuelle lente à s'installer, attente (n° 1)
+Manette virtuelle connectée
+Pas   20144, épisode   136 : mean_return 5.64, std_return 0.21, mean_distance_m 80.17, finish_rate 0.00
+Pas   40384, épisode   180 : mean_return 283.46, std_return 0.27, mean_distance_m 2052.83, finish_rate 1.00
+Pas   60539, épisode   196 : mean_return 242.28, std_return 65.10, mean_distance_m 1924.43, finish_rate 0.67
+Pas   80008, épisode   209 : mean_return 290.86, std_return 0.31, mean_distance_m 2058.10, finish_rate 1.00
+Pas  100787, épisode   226 : mean_return 137.44, std_return 12.74, mean_distance_m 1462.43, finish_rate 0.00
+Pas  120456, épisode   244 : mean_return 219.47, std_return 100.52, mean_distance_m 1648.80, finish_rate 0.67
+Pas  140200, épisode   258 : mean_return 219.28, std_return 100.87, mean_distance_m 1646.23, finish_rate 0.67
+Pas  160190, épisode   273 : mean_return 192.87, std_return 71.94, mean_distance_m 1694.53, finish_rate 0.33
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.05023709962551948
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.0729582997300895
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.09046649999800138
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.07173839998722542
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  180531, épisode   293 : mean_return 94.47, std_return 23.15, mean_distance_m 1005.87, finish_rate 0.00
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 1.5058899994037347
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  200000, épisode   309 : mean_return 175.59, std_return 89.29, mean_distance_m 1511.00, finish_rate 0.33
+Évaluations dans results\sac_trackmania_p3_time_seed5.csv, agents dans checkpoints\sac_trackmania_p3_time_seed5.pt et checkpoints\sac_trackmania_p3_time_seed5_best.pt

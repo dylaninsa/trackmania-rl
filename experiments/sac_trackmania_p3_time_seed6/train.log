@@ -1,0 +1,17 @@
+Manette virtuelle lente à s'installer, attente (n° 1)
+Manette virtuelle connectée
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 0.1004102998849703
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas   20460, épisode   122 : mean_return 7.92, std_return 0.01, mean_distance_m 91.40, finish_rate 0.00
+Pas   40413, épisode   165 : mean_return 287.48, std_return 0.52, mean_distance_m 2056.87, finish_rate 1.00
+Pas   61107, épisode   194 : mean_return 217.01, std_return 99.53, mean_distance_m 1646.50, finish_rate 0.67
+Pas   80772, épisode   208 : mean_return 163.00, std_return 91.36, mean_distance_m 1414.87, finish_rate 0.33
+Pas  100122, épisode   283 : mean_return 0.75, std_return 0.02, mean_distance_m 15.53, finish_rate 0.00
+Pas  120197, épisode   297 : mean_return 286.21, std_return 0.31, mean_distance_m 2058.80, finish_rate 1.00
+Pas  140960, épisode   311 : mean_return 243.64, std_return 63.89, mean_distance_m 1928.70, finish_rate 0.67
+Pas  161149, épisode   325 : mean_return 245.69, std_return 64.51, mean_distance_m 1921.57, finish_rate 0.67
+Pas  181491, épisode   339 : mean_return 291.97, std_return 0.28, mean_distance_m 2058.73, finish_rate 1.00
+C:\Users\synxr\OneDrive\Documents\INSA\ETS\Cours\MTI881\Projet\trackmania-rl\.venv\Lib\site-packages\rtgym\envs\real_time_env.py:261: UserWarning: Time-step timed out. Elapsed since last time-step: 1.5065845959616126
+  warnings.warn(f"Time-step timed out. Elapsed since last time-step: {now - self.__t_end}")
+Pas  200000, épisode   353 : mean_return 291.69, std_return 0.60, mean_distance_m 2057.83, finish_rate 1.00
+Évaluations dans results\sac_trackmania_p3_time_seed6.csv, agents dans checkpoints\sac_trackmania_p3_time_seed6.pt et checkpoints\sac_trackmania_p3_time_seed6_best.pt
