@@ -28,8 +28,15 @@ direction > 0 tourne à droite. Un pas dure 0,05 s (20 Hz).
 
 **Récompense** : calculée par `TrajectoryReward` (`envs/reward.py`). C'est le
 nombre de points de la trajectoire franchis depuis le pas précédent ÷ 100, soit
-1 unité pour 10 m, plus un bonus de +100 au pas de l'arrivée. Elle n'est jamais
-négative : reculer ne rapporte rien.
+1 unité pour 10 m, plus un bonus de +100 au pas de l'arrivée. Reculer ne rapporte
+rien. Un tour rapporte donc environ 306 quel que soit le temps mis : rien n'incite
+la voiture à aller vite.
+
+**Pénalité de temps** (`time_penalty`, 0 par défaut) : retirée de la récompense à
+chaque pas, y compris au dernier. Avec 0,01, la voiture gagne 0,005 × v par pas
+(v en m/s), et la pénalité ne l'emporte que sous 2 m/s, quasiment à l'arrêt : se
+crasher exprès pour arrêter de payer ne rapporte rien tant qu'elle avance. Un tour
+au rythme du PID (2 330 pas) coûte 23 points, et 10 s gagnées rapportent 2 points.
 
 **Fin d'épisode**
 - `terminated=True` dans trois cas :
@@ -42,8 +49,10 @@ négative : reculer ne rapporte rien.
   limite laisse au PID, qui met environ 2 330 pas, le temps de finir le parcours ;
   utiliser la même valeur pour toutes les politiques comparées.
 
-Les réglages de la récompense sont les paramètres de `TrajectoryReward`. La
-section `REWARD_CONFIG` de `config.json` n'est plus utilisée.
+Les réglages de la récompense sont les paramètres de `TrajectoryReward`. On les
+change depuis la section `reward` d'une configuration, par exemple
+`"reward": {"time_penalty": 0.01}`. La section `REWARD_CONFIG` du `config.json` de
+TMRL n'est plus utilisée.
 
 **`info`** : `speed`, `end_of_track`, `progress` (0 → 1),
 `distance_m`, `dist_to_traj`.

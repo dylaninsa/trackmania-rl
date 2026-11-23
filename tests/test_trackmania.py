@@ -49,6 +49,24 @@ def test_interface_reads_our_trajectory(tmp_path, monkeypatch):
     interface.initialize()
 
     np.testing.assert_array_equal(interface.reward_function.trajectory, trajectory)
+    assert interface.reward_function.time_penalty == 0.0
+
+
+def test_interface_passes_the_reward_settings(tmp_path, monkeypatch):
+    reward_path = tmp_path / "trajectory.pkl"
+    reward_path.write_bytes(pickle.dumps(np.zeros((50, 3))))
+
+    def fake_initialize_common(self):
+        self.window_interface = type("FakeWindow", (), {"screenshot": lambda _: None})()
+
+    monkeypatch.setattr(tm_interfaces.TM2020Interface, "initialize_common", fake_initialize_common)
+    monkeypatch.setattr(tm_interfaces, "Lidar", lambda img: None)
+
+    interface = LidarInterface(reward_path, reward_kwargs={"time_penalty": 0.01, "finish_bonus": 50.0})
+    interface.initialize()
+
+    assert interface.reward_function.time_penalty == 0.01
+    assert interface.reward_function.finish_bonus == 50.0
 
 
 def test_interface_step_gives_our_finish_bonus(monkeypatch):
