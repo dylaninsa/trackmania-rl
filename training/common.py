@@ -27,7 +27,8 @@ def make_envs(config):
     ``envs.trackmania`` is imported only for TrackMania, so that the other environments do not need TMRL.
 
     Args:
-        config (dict): Configuration, with ``env`` and ``ep_max_length``.
+        config (dict): Configuration, with ``env`` and ``ep_max_length``. For TrackMania, an optional ``reward``
+            section gives the keyword arguments of ``TrajectoryReward``, such as ``time_penalty``.
 
     Returns:
         tuple[gymnasium.Env, gymnasium.Env]: Training and evaluation environments. They are the same object
@@ -35,7 +36,7 @@ def make_envs(config):
     """
     if config["env"] == "trackmania":
         from envs.trackmania import make_env
-        env = make_env(ep_max_length=config["ep_max_length"])
+        env = make_env(ep_max_length=config["ep_max_length"], reward_kwargs=config.get("reward"))
         return env, env
     return gym.make(config["env"]), gym.make(config["env"])
 
