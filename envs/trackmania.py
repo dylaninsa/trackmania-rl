@@ -146,18 +146,21 @@ class LidarInterface(TM2020InterfaceLidar):
 
     Args:
         reward_path (str | pathlib.Path): Demonstration trajectory (.pkl) of the track loaded in the game.
+        reward_kwargs (dict | None): Keyword arguments of ``TrajectoryReward``, such as ``time_penalty``. None
+            keeps its default settings.
     """
 
-    def __init__(self, reward_path):
+    def __init__(self, reward_path, reward_kwargs=None):
         super().__init__(img_hist_len=4, gamepad=True)
         self.reward_path = str(reward_path)
+        self.reward_kwargs = reward_kwargs or {}
         self.data = None
 
     def initialize(self):
         """Connects to the game, then replaces TMRL's reward function with one that reads our trajectory."""
         use_patient_gamepad()
         super().initialize()
-        self.reward_function = TrajectoryReward(load_trajectory(self.reward_path))
+        self.reward_function = TrajectoryReward(load_trajectory(self.reward_path), **self.reward_kwargs)
 
     def send_control(self, control):
         """Sends an action clipped to [-1, 1], because the virtual gamepad crashes on other values.
@@ -251,7 +254,7 @@ class FlattenLidarObservation(gymnasium.ObservationWrapper):
         ]).astype(np.float32)
 
 
-def make_env(reward_path=DEFAULT_REWARD_PATH, ep_max_length=3000, flatten=True):
+def make_env(reward_path=DEFAULT_REWARD_PATH, ep_max_length=3000, flatten=True, reward_kwargs=None):
     """Creates the TrackMania environment.
 
     Args:
@@ -259,6 +262,8 @@ def make_env(reward_path=DEFAULT_REWARD_PATH, ep_max_length=3000, flatten=True):
         ep_max_length (int): Number of steps before the episode is truncated.
         flatten (bool): If True, observations are vectors of size 83. Otherwise, TMRL's raw tuple is
             returned, which is needed to send None actions and drive manually.
+        reward_kwargs (dict | None): Keyword arguments of ``TrajectoryReward``, such as ``time_penalty``. None
+            keeps its default settings.
 
     Returns:
         gymnasium.Env: The real-time environment.
@@ -271,7 +276,7 @@ def make_env(reward_path=DEFAULT_REWARD_PATH, ep_max_length=3000, flatten=True):
         raise FileNotFoundError(reward_path)
     config = dict(CONFIG_DICT)
     config["interface"] = LidarInterface
-    config["interface_kwargs"] = {"reward_path": reward_path}
+    config["interface_kwargs"] = {"reward_path": reward_path, "reward_kwargs": reward_kwargs}
     config["ep_max_length"] = ep_max_length
     env = gymnasium.make(cfg.RTGYM_VERSION, config=config, disable_env_checker=True)
     return FlattenLidarObservation(env) if flatten else env

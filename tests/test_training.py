@@ -110,6 +110,22 @@ def test_make_envs_creates_two_separate_gym_envs():
     eval_env.close()
 
 
+@pytest.mark.parametrize("config, expected", [
+    ({"env": "trackmania", "ep_max_length": 3000}, None),
+    ({"env": "trackmania", "ep_max_length": 3000, "reward": {"time_penalty": 0.01}}, {"time_penalty": 0.01}),
+])
+def test_make_envs_passes_the_reward_settings_to_trackmania(monkeypatch, config, expected):
+    import envs.trackmania
+
+    calls = []
+    monkeypatch.setattr(envs.trackmania, "make_env", lambda **kwargs: calls.append(kwargs) or object())
+
+    env, eval_env = make_envs(config)
+
+    assert env is eval_env
+    assert calls == [{"ep_max_length": 3000, "reward_kwargs": expected}]
+
+
 def test_evaluate_plays_deterministic_episodes():
     env, _ = make_envs({"env": "Pendulum-v1", "ep_max_length": 200})
     agent = ConstantAgent(np.zeros(1, dtype=np.float32))

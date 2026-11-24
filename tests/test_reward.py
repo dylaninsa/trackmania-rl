@@ -101,3 +101,22 @@ def test_reset():
     rf.reset()
 
     assert (rf.index, rf.steps, rf.steps_without_progress, rf.dist_to_traj) == (0, 0, 0, 0.0)
+
+
+def test_time_penalty_is_paid_at_every_step():
+    rf = TrajectoryReward(make_line(), time_penalty=0.01, grace_steps=0, patience=5)
+
+    assert rf.compute_reward(np.array([1.0, 0.0, 0.0])) == (pytest.approx(0.09), False)
+    assert rf.compute_reward(np.array([1.0, 0.0, 0.0])) == (pytest.approx(-0.01), False)
+
+
+def test_time_penalty_is_paid_when_leaving_the_track():
+    rf = TrajectoryReward(make_line(), max_distance_m=5.0, time_penalty=0.01)
+
+    assert rf.compute_reward(np.array([1.0, 6.0, 0.0])) == (pytest.approx(-0.01), True)
+
+
+def test_time_penalty_is_paid_at_the_finish():
+    rf = TrajectoryReward(make_line(), finish_bonus=100.0, time_penalty=0.01)
+
+    assert rf.compute_reward(np.array([1.0, 0.0, 0.0]), finished=True) == (pytest.approx(100.09), True)

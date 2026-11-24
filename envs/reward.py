@@ -3,7 +3,7 @@
 The demonstration trajectory is a run from start to finish recorded with ``python -m tmrl --record-reward``,
 stored as points spaced ``POINT_SPACING_M`` apart. At each step, the car is matched to the closest point
 ahead of its current point, and the reward is the number of points passed since the previous step, divided
-by 100.
+by 100, minus an optional time penalty that rewards finishing faster.
 
 Attributes:
     POINT_SPACING_M (float): Distance in meters between two consecutive points of a trajectory.
@@ -40,16 +40,19 @@ class TrajectoryReward:
         grace_steps (int): Number of steps at the start of an episode during which a lack of progress is not
             counted, because the car starts from a standstill.
         finish_bonus (float): Bonus reward for completing the trajectory.
+        time_penalty (float): Subtracted from the reward at every step, including the last one, so that a
+            faster lap earns more. 0 gives a reward that does not depend on the lap time.
     """
 
     def __init__(self, trajectory, max_forward_points=500, max_distance_m=30.0, patience=10, grace_steps=70,
-                 finish_bonus=100.0):
+                 finish_bonus=100.0, time_penalty=0.0):
         self.trajectory = trajectory
         self.max_forward_points = max_forward_points
         self.max_distance_m = max_distance_m
         self.patience = patience
         self.grace_steps = grace_steps
         self.finish_bonus = finish_bonus
+        self.time_penalty = time_penalty
         self.reset()
 
     def reset(self):
@@ -86,15 +89,15 @@ class TrajectoryReward:
             finished (bool): Whether the car has reached the end of the trajectory.
 
         Returns:
-            tuple[float, bool]: Reward (number of points passed divided by 100, and bonus for finishing)
-                and terminated flag.
+            tuple[float, bool]: Reward (number of points passed divided by 100, minus the time penalty, plus
+                the bonus for finishing) and terminated flag.
         """
         self.steps += 1
         nearest_idx, dist_to_traj = self.nearest_point(pos)
         self.dist_to_traj = dist_to_traj
         if dist_to_traj > self.max_distance_m:
-            return 0.0, True
-        reward = (nearest_idx - self.index) / 100.0
+            return -self.time_penalty, True
+        reward = (nearest_idx - self.index) / 100.0 - self.time_penalty
         if nearest_idx > self.index:
             self.steps_without_progress = 0
         elif self.steps > self.grace_steps:
