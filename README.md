@@ -62,6 +62,9 @@ uv run python scripts/run_queue.py experiments/queue_phase3c_time.json
 uv run python scripts/evaluate.py --policy sac --config configs/sac_trackmania_p3_time.json --checkpoint checkpoints/sac_trackmania_p3_time_seed4_best.pt --episodes 10
 uv run python scripts/evaluate.py --policy pid --episodes 10
 
+# Évaluer sur une autre piste, chargée dans le jeu (épisodes plus longs pour une piste plus longue)
+uv run python scripts/evaluate.py --policy pid --episodes 10 --reward-path data/reward/circuit2.pkl --ep-max-length 4500
+
 # Suivre les courbes de tous les runs partagés
 uv run tensorboard --logdir experiments
 ```

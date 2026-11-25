@@ -20,6 +20,10 @@ Examples:
 
         uv run python scripts/evaluate.py --policy sac --config configs/sac_trackmania.json --checkpoint checkpoints/sac_trackmania_seed0.pt --episodes 5
 
+    Evaluate the PID heuristic on another track, loaded in the game, with longer episodes::
+
+        uv run python scripts/evaluate.py --policy pid --reward-path data/reward/circuit2.pkl --ep-max-length 4500
+
 Attributes:
     TIME_STEP (float): Duration of a step in seconds, used to compute the finish time.
     AGENTS (dict): Agent class of each trained policy, by name on the command line.
@@ -33,7 +37,7 @@ from pathlib import Path
 from algos.ppo import PPOAgent
 from algos.sac import SACAgent
 from baselines.policies import PIDPolicy, RandomPolicy
-from envs.trackmania import make_env
+from envs.trackmania import DEFAULT_REWARD_PATH, make_env
 
 TIME_STEP = 0.05
 AGENTS = {"ppo": PPOAgent, "sac": SACAgent}
@@ -118,12 +122,35 @@ def run_episode(env, policy):
     }
 
 
+def default_output(args):
+    """Chooses the CSV file of the results when ``--output`` is not given.
+
+    The file is ``results/<policy>.csv``, ``results/random_seed<seed>.csv`` for the random agent with a seed,
+    and ``results/eval_<checkpoint>.csv`` for a trained agent. On a track other than ``tmrl-test``, the name of
+    its trajectory file is appended, so that the results of the two tracks do not overwrite each other.
+
+    Args:
+        args (argparse.Namespace): Command line arguments: ``policy``, ``seed``, ``checkpoint`` and
+            ``reward_path``.
+
+    Returns:
+        pathlib.Path: Output CSV file.
+    """
+    if args.policy in AGENTS:
+        name = f"eval_{Path(args.checkpoint).stem}"
+    elif args.policy == "random" and args.seed is not None:
+        name = f"random_seed{args.seed}"
+    else:
+        name = args.policy
+    if Path(args.reward_path).resolve() != DEFAULT_REWARD_PATH:
+        name += f"_{Path(args.reward_path).stem}"
+    return Path("results") / f"{name}.csv"
+
+
 def main():
     """Evaluates the policy given on the command line and writes one CSV row per episode.
 
-    The default output file is ``results/<policy>.csv``, ``results/random_seed<seed>.csv`` for the random
-    agent with a seed, so that the results of different seeds are not overwritten, and
-    ``results/eval_<checkpoint>.csv`` for a trained agent.
+    The output file is ``--output``, or else the one chosen by ``default_output``.
     """
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--policy", choices=["random", "pid", *AGENTS], required=True)
@@ -133,20 +160,15 @@ def main():
     parser.add_argument("--config", default=None, help="configuration d'entraînement de l'agent")
     parser.add_argument("--checkpoint", default=None, help="fichier .pt de l'agent")
     parser.add_argument("--output", default=None, help="fichier CSV de sortie")
+    parser.add_argument("--reward-path", default=DEFAULT_REWARD_PATH,
+                        help="trajectoire (.pkl) de la piste chargée dans le jeu")
     args = parser.parse_args()
     if args.policy in AGENTS and (args.config is None or args.checkpoint is None):
         parser.error(f"--policy {args.policy} demande --config et --checkpoint")
 
-    if args.output is not None:
-        output_file = Path(args.output)
-    elif args.policy in AGENTS:
-        output_file = Path("results") / f"eval_{Path(args.checkpoint).stem}.csv"
-    elif args.policy == "random" and args.seed is not None:
-        output_file = Path("results") / f"random_seed{args.seed}.csv"
-    else:
-        output_file = Path("results") / f"{args.policy}.csv"
+    output_file = Path(args.output) if args.output is not None else default_output(args)
 
-    env = make_env(ep_max_length=args.ep_max_length)
+    env = make_env(reward_path=args.reward_path, ep_max_length=args.ep_max_length)
     policy = make_policy(args, env)
 
     results = []
