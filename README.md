@@ -4,10 +4,12 @@ Agents d'apprentissage par renforcement codés de zéro (PPO et SAC) pour boucle
 partir d'observations LIDAR. [TMRL](https://github.com/trackmania-rl/tmrl) n'est utilisé que pour son
 interface Gymnasium avec le jeu.
 
-**Où on en est :** sur la piste `tmrl-test` (2 059 m), SAC termine le parcours sur les 3 graines dès
-60 000 pas, alors que PPO ne le termine jamais. SAC est en revanche instable : deux graines sur trois
-s'effondrent en fin de run. La phase 3 cherche à le stabiliser (voir
-[`experiments/journal.md`](experiments/journal.md)).
+**Où on en est :** sur la piste `tmrl-test` (2 059 m), SAC termine le parcours alors que PPO ne le termine
+jamais. Après réglage (phase 3), les 7 agents SAC évalués bouclent le tour, 6 sur 7 plus vite que
+l'heuristique PID (117 s). Le meilleur, entraîné avec une pénalité de temps, termine 10 tours sur 10 en
+61 s en moyenne. SAC reste instable d'une graine à l'autre, et les résultats dépendent de la machine
+d'entraînement. Détails : [`docs/entrainement_trackmania.md`](docs/entrainement_trackmania.md) et
+[`experiments/journal.md`](experiments/journal.md).
 
 ## Structure
 
@@ -54,11 +56,11 @@ uv run python scripts/train_sac.py --config configs/sac_trackmania.json --seed 0
 uv run python scripts/train_ppo.py --config configs/ppo_trackmania.json --seed 0
 
 # Plusieurs entraînements à la suite, sans surveillance (relançable après une coupure)
-uv run python scripts/run_queue.py experiments/queue_phase3a_seed0.json
+uv run python scripts/run_queue.py experiments/queue_phase3c_time.json
 
 # Évaluer un agent entraîné, ou une politique de référence
-uv run python scripts/evaluate.py --policy sac --config configs/sac_trackmania.json --checkpoint checkpoints/sac_trackmania_seed0_best.pt --episodes 10
-uv run python scripts/evaluate.py --policy pid --episodes 5
+uv run python scripts/evaluate.py --policy sac --config configs/sac_trackmania_p3_time.json --checkpoint checkpoints/sac_trackmania_p3_time_seed4_best.pt --episodes 10
+uv run python scripts/evaluate.py --policy pid --episodes 10
 
 # Suivre les courbes de tous les runs partagés
 uv run tensorboard --logdir experiments
@@ -81,8 +83,8 @@ Chaque run s'appelle `<config>_seed<graine>` et produit :
 - [Validation sur Pendulum-v1](docs/validation_pendulum.md) : PPO, replay buffer et SAC, protocole et
   résultats.
 - [Test d'intégration SAC et TrackMania](docs/test_integration_sac.md) : durées mesurées en jeu.
-- [Entraînement sur TrackMania](docs/entrainement_trackmania.md) : boucle, checkpoints et résultats de la
-  phase 1.
+- [Entraînement sur TrackMania](docs/entrainement_trackmania.md) : boucle, checkpoints, résultats des
+  phases 1 à 3 et évaluation finale.
 - [Journal d'expériences](experiments/journal.md) : tous les runs, phase par phase.
 
 ## Méthode de travail
