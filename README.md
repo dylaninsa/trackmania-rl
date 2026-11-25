@@ -1,13 +1,14 @@
-# TrackMania RL — MTI881, Groupe 4
+# TrackMania RL
 
-Agents d'apprentissage par renforcement codés de zéro (PPO et SAC) pour boucler un circuit TrackMania 2020 à
+Agents d'apprentissage par renforcement (PPO et SAC) pour terminer un circuit TrackMania 2020 à
 partir d'observations LIDAR. [TMRL](https://github.com/trackmania-rl/tmrl) n'est utilisé que pour son
 interface Gymnasium avec le jeu.
 
 **Où on en est :** sur la piste `tmrl-test` (2 059 m), SAC termine le parcours alors que PPO ne le termine
-jamais. Après réglage (phase 3), les 7 agents SAC évalués bouclent le tour, 6 sur 7 plus vite que
+jamais. Après réglage (phase 3), les 7 agents SAC évalués terminent le tour, 6 sur 7 plus vite que
 l'heuristique PID (117 s). Le meilleur, entraîné avec une pénalité de temps, termine 10 tours sur 10 en
-61 s en moyenne. SAC reste instable d'une graine à l'autre, et les résultats dépendent de la machine
+61 s en moyenne. Sur une piste qu'ils n'ont jamais vue, 6 agents sur 7 terminent encore le tour, tous plus
+vite que le PID. SAC reste instable d'une graine à l'autre, et les résultats dépendent de la machine
 d'entraînement. Détails : [`docs/entrainement_trackmania.md`](docs/entrainement_trackmania.md) et
 [`experiments/journal.md`](experiments/journal.md).
 

@@ -37,12 +37,14 @@ SAC apprend environ 3 fois plus vite et termine le parcours de 2 059 m ; PPO but
 parcours. Ces runs datent d'avant l'évaluation finale et `_best.pt` : leur dernière évaluation a eu lieu vers
 180 000 pas, et seul l'agent final a été gardé.
 
-## Phase 2 : variantes
+## Phase 2 : présélection des réglages
 
-Une graine, une variante par hyperparamètre. Deux réglages de SAC aident : `init_alpha` à 0,1 au lieu de 1
-(moins d'exploration au départ) et `updates_per_step` à 0,5 (pauses deux fois plus courtes en fin d'épisode).
-Aucune variante de PPO ne change le résultat. Avec une seule graine, ces résultats ont seulement orienté la
-phase 3.
+Des runs courts (60 000 pas, une graine), une variante par hyperparamètre, pour repérer les réglages qui
+aident à apprendre avant d'en tester quelques-uns à fond. Aucune variante de PPO ne change le résultat : la
+suite du projet porte donc sur SAC seul. Deux réglages de SAC aident : `init_alpha` à 0,1 au lieu de 1
+(moins d'exploration au départ) et `updates_per_step` à 0,5 (pauses deux fois plus courtes en fin
+d'épisode). Avec une seule graine et deux points de mesure, ces résultats orientent la phase 3 sans rien
+prouver.
 
 ## Phase 3 : stabiliser SAC, puis l'accélérer
 
@@ -54,11 +56,11 @@ phase 3.
 - `p3_lr1e4` y ajoute `lr` 1e-4 ;
 - `p3_gamma995` y ajoute `gamma` 0,995.
 
-Sur le PC de Dylan, `p3_base` remplit le critère ; les deux autres atteignent l'arrivée mais restent
+Sur le PC 1, `p3_base` remplit le critère ; les deux autres atteignent l'arrivée mais restent
 instables. Sur les deux autres machines, presque rien n'apprend.
 
 **3b, dépendance à la machine.** Ce plan confondait la machine et la graine. `p3_base` a donc été relancée sur
-3 nouvelles graines, toutes sur le PC de Dylan, et elle apprend sur les 3. La même configuration apprend sur
+3 nouvelles graines, toutes sur le PC 1, et elle apprend sur les 3. La même configuration apprend sur
 4 graines sur 4 sur ce PC, et sur aucune des 3 ailleurs. Les causes probables :
 - le LIDAR, calculé à partir de l'image de la fenêtre, dépend du rendu ;
 - certaines machines dépassent souvent le pas de 0,05 s.
@@ -73,7 +75,7 @@ l'instabilité : seule une graine sur quatre remplit le critère strict.
 
 ## Évaluation finale
 
-Le checkpoint `_best.pt` de chaque run est évalué sur 10 épisodes, sur le PC de Dylan. Les temps ne portent
+Le checkpoint `_best.pt` de chaque run est évalué sur 10 épisodes, sur le PC 1. Les temps ne portent
 que sur les tours terminés. Les CSV sont dans `experiments/final_eval/`.
 
 | Agent | Arrivées | Temps moyen (s) | Meilleur temps (s) |
@@ -82,24 +84,41 @@ que sur les tours terminés. Les CSV sont dans `experiments/final_eval/`.
 | `p3_base` graines 0 / 4 / 5 / 6 | 8 / 9 / 10 / 8 | 115,1 / 92,6 / 90,1 / 69,4 | 108,8 / 90,8 / 85,8 / 67,5 |
 | `p3_time` graines 4 / 5 / 6 | 10 / 5 / 10 | 61,4 / 74,1 / 97,2 | 57,9 / 69,1 / 93,8 |
 
-- Tous les agents bouclent le tour, et 6 sur 7 vont plus vite que le PID en moyenne. Le meilleur
+- Tous les agents terminent le tour, et 6 sur 7 vont plus vite que le PID en moyenne. Le meilleur
   (`p3_time`, graine 4) termine 10 tours sur 10, deux fois plus vite que le PID.
 - `p3_base` termine 35 épisodes sur 40, et `p3_time` 25 sur 30.
 - L'effet de la pénalité de temps n'est pas systématique. Graine par graine, le tour passe de 92,6 à 61,4 s
   et de 90,1 à 74,1 s, mais de 69,4 à 97,2 s sur la graine 6. Trois graines ne suffisent pas à conclure.
 - La graine 6 s'explique par le choix du checkpoint. `_best.pt` est choisi sur la distance, qui est la même
-  pour tout agent qui boucle le tour. Le checkpoint retenu est donc un agent de 120 000 pas, lent, alors que
+  pour tout agent qui termine le tour. Le checkpoint retenu est donc un agent de 120 000 pas, lent, alors que
   celui de 180 000 pas bouclait en environ 70 s. Avec une récompense qui intègre la vitesse, il faudrait
   choisir le checkpoint sur le retour. Ce critère n'a pas été changé après coup.
 
+## Généralisation à une piste inconnue
+
+`circuit2` reprend les blocs plats de `tmrl-test` avec un autre tracé de 2 340 m, que les agents n'ont jamais
+vu. Les mêmes checkpoints y sont évalués sur 9 épisodes : le premier épisode de chaque évaluation est écarté,
+parce que la voiture n'y démarrait pas, PID compris.
+
+| Agent | Arrivées | Temps moyen (s) | Meilleur temps (s) |
+|-------|----------|-----------------|--------------------|
+| PID | 9/9 | 135,7 | 135,1 |
+| `p3_base` graines 0 / 4 / 5 / 6 | 9 / 7 / 9 / 1 | 127,2 / 103,7 / 98,8 / 92,2 | 119,3 / 102,2 / 97,2 / 92,2 |
+| `p3_time` graines 4 / 5 / 6 | 7 / 9 / 9 | 68,5 / 91,5 / 113,4 | 66,9 / 85,9 / 111,0 |
+
+6 agents sur 7 terminent ce tracé inconnu, presque à chaque essai, et tous les agents qui arrivent vont plus
+vite que le PID : ils ont appris à conduire, pas à réciter `tmrl-test`. Le plus rapide reste `p3_time`
+graine 4 (68,5 s). L'exception est `p3_base` graine 6, le plus rapide sans pénalité sur `tmrl-test`, qui sort
+presque toujours aux trois mêmes endroits. Ce test ne change que le tracé : il ne dit rien d'autres surfaces
+ni de routes en relief.
+
 ## Limites
 
-- **Une seule machine.** Les résultats finaux viennent tous du PC de Dylan, et la même configuration n'apprend
+- **Une seule machine.** Les résultats finaux viennent tous du PC 1, et la même configuration n'apprend
   pas sur deux autres machines du groupe.
 - **Peu de graines.** 3 ou 4 graines par configuration montrent des tendances, pas des différences
   statistiquement établies.
 - **Instabilité.** SAC reste instable en fin de run sur une graine sur trois ou quatre. Garder le meilleur
   checkpoint contourne le problème sans le résoudre.
-- **Une seule piste.** Tout l'entraînement a lieu sur `tmrl-test`.
 
 Le détail de chaque run est dans [`experiments/journal.md`](../experiments/journal.md).
