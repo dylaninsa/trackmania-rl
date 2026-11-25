@@ -35,8 +35,7 @@ la voiture à aller vite.
 **Pénalité de temps** (`time_penalty`, 0 par défaut) : retirée de la récompense à
 chaque pas, y compris au dernier. Avec 0,01, la voiture gagne 0,005 × v par pas
 (v en m/s), et la pénalité ne l'emporte que sous 2 m/s, quasiment à l'arrêt : se
-crasher exprès pour arrêter de payer ne rapporte rien tant qu'elle avance. Un tour
-au rythme du PID (2 330 pas) coûte 23 points, et 10 s gagnées rapportent 2 points.
+crasher exprès pour arrêter de payer ne rapporte rien tant qu'elle avance. 
 
 **Fin d'épisode**
 - `terminated=True` dans trois cas :
@@ -67,8 +66,7 @@ TMRL n'est plus utilisée.
   que la politique et les réseaux.
 
 La trajectoire `data/reward/tmrl-test.pkl` a été enregistrée par nos soins sur
-`tmrl-test` (20 589 points espacés de 0,1 m, 2 059 m). Celle fournie par TMRL ne
-correspond pas à la piste : l'arrivée tombait à 72,6 % de progression.
+`tmrl-test` (20 589 points espacés de 0,1 m, 2 059 m).
 
 **Enregistrer une trajectoire** : `uv run python -m tmrl --record-reward` enregistre
 dès son lancement et s'arrête à l'arrivée. Faire un seul parcours sans relancer la

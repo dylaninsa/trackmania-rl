@@ -23,7 +23,7 @@ nulles au `reset`, clés de `info`, récompense jamais négative), la validité 
 métriques de `update`, et mesure la durée de `act()`, d'un pas et d'une mise à jour. Les violations sont
 listées en fin d'exécution et le code de sortie vaut 1 s'il y en a.
 
-**Résultats** (machine d'Antoine, CPU ; réseaux de 256 unités, lots de 256 ; réglages provisoires fixés
+**Résultats** (machine 2, CPU ; réseaux de 256 unités, lots de 256 ; réglages provisoires fixés
 dans le script, à remplacer par `configs/`) :
 
 | Mesure | Valeur | Lecture |
